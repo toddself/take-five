@@ -1,6 +1,5 @@
 const {listen, listenTLS} = Deno
-import {HTTPSOptions, Server, ServerRequest, Response} from 'http://deno.land/std/http/server.ts'
-import {STATUS_TEXT} from 'http://deno.land/std/http/http_status.ts'
+import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT} from 'http://deno.land/std/http/mod.ts'
 import {wayfarer, Emitter} from './wayfarer.ts'
 
 const dataMethods = ['put', 'post', 'patch']
