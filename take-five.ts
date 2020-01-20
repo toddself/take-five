@@ -12,8 +12,8 @@ const CREDENTIALS = true
 const ALLOWED_TYPES = ['application/json']
 const HEADERS = ['Content-Type', 'Accept', 'X-Requested-With']
 
-type Encoder = (content: string, ...args: any[]) => any
-type Decoder = (content: any, ...args: any[]) => string
+export type Encoder = (content: string, route: string) => any
+export type Decoder = (content: any, route: string) => string
 
 interface Parser {
   toStructure: Encoder
@@ -24,7 +24,7 @@ interface ParserList {
   [key: string]: Parser
 }
 
-interface HTTPOptions {
+export interface HTTPOptions {
   port: number
   addr?: string
   certFile?: string
@@ -50,10 +50,10 @@ export interface TakeFiveContext {
   maxPost?: number,
   allowContentTypes?: string[]
   query: {
-    [key: string]: any
+    [key: string]: string
   },
   params: {
-    [key: string]: any
+    [key: string]: string
   }
   [key: string]: any
 }
@@ -90,8 +90,8 @@ export class TakeFive {
   private _allowContentTypes: string[] = ALLOWED_TYPES.slice(0)
   private parsers: ParserList = {
     'application/json': {
-      toStructure: JSON.parse,
-      toString: JSON.stringify
+      toStructure: (content) => JSON.parse(content),
+      toString: (data) => JSON.stringify(data)
     }
   }
   private _httpOpts: HTTPOptions
@@ -186,10 +186,10 @@ export class TakeFive {
     return this._ctx
   }
 
-  parseBody (data: string, type: string): any {
+  parseBody (data: string, type: string, route: string): any {
     const parser = this.parsers[type]
     if (parser && typeof parser.toStructure === 'function') {
-      return parser.toStructure(data)
+      return parser.toStructure(data, route)
     }
     return data
   }
@@ -208,7 +208,7 @@ export class TakeFive {
           content = parser.toString(content, req.url)
         } else {
           res.headers.append('Content-Type', 'application/json')
-          content = this.parsers['application/json'].toString(content)
+          content = this.parsers['application/json'].toString(content, req.url)
         }
       }
 
@@ -288,7 +288,7 @@ export class TakeFive {
         bufSlice = bufSlice.subarray(nread)
       }
       try {
-        ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type)
+        ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type, req.url)
       } catch (err) {
         ctx.finished = true
         ctx.err(400, `Payload is not valid ${type}`)
