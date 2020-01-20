@@ -10,7 +10,7 @@ TEST_FILES :=	$(wildcard *_test.ts)
 all: clean test bundle
 
 clean:
-		rm mod.ts
+		rm -f mod.ts
 
 test:
 		$(foreach var,$(TEST_FILES),deno --allow-net $(var);)

@@ -1,0 +1,24 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Deno environment
+        uses: denolib/setup-deno@v1.2.0
+      - name: Checkout
+        uses: actions/checkout@v2.0.0
+      - name: Bundle
+        run: make clean && make bundle
+      - name: Upload
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+        run: curl -u toddself@fastmail.com:${TOKEN} -T mod.ts https://webdav.fastmail.com/toddself.fastmail.com/files/stop.computer/take-five/
+      
