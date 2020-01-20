@@ -1,6 +1,7 @@
-const {listen, listenTLS} = Deno
-import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT} from 'http://deno.land/std/http/mod.ts'
+import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT, serve, serveTLS} from 'http://deno.land/std/http/mod.ts'
 import {wayfarer, Emitter} from './wayfarer.ts'
+
+export {Response, ServerRequest}
 
 const dataMethods = ['put', 'post', 'patch']
 const methods = ['get', 'put', 'post', 'delete', 'patch']
@@ -11,10 +12,16 @@ const CREDENTIALS = true
 const ALLOWED_TYPES = ['application/json']
 const HEADERS = ['Content-Type', 'Accept', 'X-Requested-With']
 
-type ParserFunc = (content: string, ...args: any[]) => any
+type Encoder = (content: string, ...args: any[]) => any
+type Decoder = (content: any, ...args: any[]) => string
+
+interface Parser {
+  toStructure: Encoder
+  toString: Decoder
+}
 
 interface ParserList {
-  [key: string]: ParserFunc
+  [key: string]: Parser
 }
 
 interface HTTPOptions {
@@ -26,13 +33,13 @@ interface HTTPOptions {
 
 export interface TakeFiveOpts {
   maxPost?: number
-  allowContentTypes?: string[]
+  allowContentTypes?: string | string[]
   allowOrigin?: string
   allowCredentials?: boolean
-  allowHeaders?: string[]
-  allowMethods?: string[]
+  allowHeaders?: string | string[]
+  allowMethods?: string | string[]
   http?: HTTPOptions
-  methods?: string[]
+  methods?: string | string[]
 }
 
 export interface TakeFiveContext {
@@ -48,10 +55,25 @@ export interface TakeFiveContext {
   params: {
     [key: string]: any
   }
+  [key: string]: any
 }
 
 export type ErrorHandler = (err: Error, req: ServerRequest, res: Response, ctx: TakeFiveContext) => void
 export type RouteHandler = (req: ServerRequest, res: Response, ctx: TakeFiveContext) => Promise<void>
+
+type MatcherFunction = (
+  route: string,
+  cb: RouteHandler | RouteHandler[],
+  ctxOpts?: {[key: string]: any}
+) => void
+
+export interface TakeFive {
+  get: MatcherFunction
+  put: MatcherFunction
+  post: MatcherFunction
+  patch: MatcherFunction
+  delete: MatcherFunction
+}
 
 export class TakeFive {
   maxPost: number
@@ -67,15 +89,18 @@ export class TakeFive {
   private _allowHeaders: string[] = HEADERS.slice(0)
   private _allowContentTypes: string[] = ALLOWED_TYPES.slice(0)
   private parsers: ParserList = {
-    'application/json': JSON.parse
+    'application/json': {
+      toStructure: JSON.parse,
+      toString: JSON.stringify
+    }
   }
-  private _listener: Deno.Listener
   private _httpOpts: HTTPOptions
   private _ctx: TakeFiveContext
+  private _urlBase: string
 
   constructor (opts: TakeFiveOpts = {}) {
     this.maxPost = opts.maxPost || MAX_POST
-    this.allowedContentTypes = opts.allowContentTypes
+    this.allowedContentTypes = Array.isArray(opts.allowContentTypes) ? opts.allowContentTypes : []
     this.allowOrigin = opts.allowOrigin || ORIGIN
     this.allowCredentials = CREDENTIALS
     if (typeof opts.allowCredentials === 'boolean') {
@@ -91,21 +116,28 @@ export class TakeFive {
     }
 
     this._ctx = ({} as TakeFiveContext)
-    this._httpOpts = opts.http
-
-    if (this._httpOpts.keyFile && this._httpOpts.certFile) {
-      this._listener = listenTLS(this._httpOpts as HTTPSOptions)
-    } else {
-      this._listener = listen(this._httpOpts)
-    }
+    this._httpOpts = opts.http || {} as HTTPOptions
 
     this.routers = new Map<string, Emitter>()
-    this.server = new Server(this._listener)
     this.methods = methods.concat(opts.methods || [])
     this._addRouters()
   }
 
-  async listen () {
+  async listen (port?: number) {
+    if (port) {
+      this._httpOpts.port = port
+    }
+    let protocol = 'http://'
+    let addr = this._httpOpts.addr || 'localhost'
+
+    if (this._httpOpts.keyFile && this._httpOpts.certFile) {
+      this.server = serveTLS(this._httpOpts as HTTPSOptions)
+      protocol = 'https://'
+    } else {
+      this.server = serve(this._httpOpts)
+    }
+
+    this._urlBase = `${protocol}${addr}:${this._httpOpts.port}`
     for await (const request of this.server) {
       this._onRequest(request)
     }
@@ -120,10 +152,8 @@ export class TakeFive {
     return this._allowContentTypes
   }
 
-  addParser (type: string, func: ParserFunc) {
-    if (typeof type === 'string' && typeof func === 'function') {
-      this.parsers[type] = func
-    }
+  addParser (type: string, parser: Parser) {
+    this.parsers[type] = parser
   }
 
   set allowHeaders (headers: string | string[]) {
@@ -144,12 +174,12 @@ export class TakeFive {
     return this._allowMethods
   }
 
-  set ctx (ctx: TakeFiveContext) {
+  set ctx (ctx: {[key: string]: any}) {
     const ctxType = Object.prototype.toString.call(ctx)
     if (ctxType !== '[object Object]') {
       throw new Error(`ctx must be an object, was ${ctxType}`)
     }
-    this._ctx = Object.assign({}, ctx)
+    this._ctx = Object.assign({}, ctx as TakeFiveContext)
   }
 
   get ctx () {
@@ -158,30 +188,37 @@ export class TakeFive {
 
   parseBody (data: string, type: string): any {
     const parser = this.parsers[type]
-    if (typeof parser === 'function') {
-      return parser(data)
+    if (parser && typeof parser.toStructure === 'function') {
+      return parser.toStructure(data)
     }
     return data
   }
 
   makeCtx (req: ServerRequest, res: Response) {
-    async function send (code: any, content?: any) {
+    const send = async (code: any, content?: any) => {
       if (typeof content === 'undefined') {
         content = code
         code = 200
       }
+      const isUint8 = Object.prototype.toString.call(content) === '[object Uint8Array]'
 
-      if (typeof content !== 'string') {
-        content = JSON.stringify(content)
+      if (typeof content !== 'string' && !isUint8) {
+        if (res.headers.has('Content-Type')) {
+          const parser = this.parsers[res.headers.get('Content-Type')]
+          content = parser.toString(content, req.url)
+        } else {
+          res.headers.append('Content-Type', 'application/json')
+          content = this.parsers['application/json'].toString(content)
+        }
       }
 
       res.status = code
-      res.headers.append('Content-Type', 'application/json')
-      res.body = new TextEncoder().encode(content) 
+      res.body = isUint8 ? content : new TextEncoder().encode(content) 
       return req.respond(res)
     }
 
     async function err (code: any, content?: any) {
+      const e = new Error()
       if (typeof content === 'undefined') {
         if (parseInt(code, 10)) {
           content = STATUS_TEXT.get(code)
@@ -219,14 +256,14 @@ export class TakeFive {
   }
 
   close () {
-    this.server.close()
+    return this.server.close()
   }
 
   async _verifyBody (req: ServerRequest, res: Response, ctx: TakeFiveContext): Promise<void> {
     const type = req.headers.get('Content-Type')
     const size = req.contentLength
-    const _ctxMax = ctx.maxPost
-    const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax
+    const _ctxMax = parseInt(String(ctx.maxPost), 10)
+    const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax 
 
     let allowContentTypes = this._allowContentTypes.slice(0)
     if (ctx.allowContentTypes) {
@@ -250,7 +287,12 @@ export class TakeFive {
         if (totRead >= req.contentLength) break
         bufSlice = bufSlice.subarray(nread)
       }
-      ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type)
+      try {
+        ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type)
+      } catch (err) {
+        ctx.finished = true
+        ctx.err(400, `Payload is not valid ${type}`)
+      }
     }
   }
 
@@ -281,9 +323,12 @@ export class TakeFive {
   }
 
   _addRouters () {
-    type MatcherFunction = (matcher: string, handler: RouteHandler, ctxOpts: {[key: string]: any}) => void
     const generateRouter = (method: string): MatcherFunction => {
-      return (matcher: string, handler: RouteHandler, ctxOpts: {[key: string]: any}): void => {
+      return (
+        matcher: string,
+        handler: RouteHandler | RouteHandler[],
+        ctxOpts?: {[key: string]: any}
+      ): void => {
         let router = this.routers.get(method)
         if (!router) {
           router = wayfarer('/_')
@@ -305,7 +350,7 @@ export class TakeFive {
             routeHandlers.unshift(this._verifyBody.bind(this))
           }
 
-          ctx.query = Object.fromEntries((new URL(req.url)).searchParams)
+          ctx.query = Object.fromEntries((new URL(req.url, this._urlBase)).searchParams)
           ctx.params = params
           this._resolveHandlers(req, res, ctx, routeHandlers)
         })

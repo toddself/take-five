@@ -6,7 +6,7 @@ import {
   assertThrows
 } from 'https://deno.land/std/testing/mod.ts'
 
-import { wayfarer } from '../wayfarer.ts'
+import { wayfarer } from './wayfarer.ts'
 
 test({
   name: 'should match a path',
