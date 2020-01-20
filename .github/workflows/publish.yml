@@ -20,5 +20,5 @@ jobs:
       - name: Upload
         env:
           TOKEN: ${{ secrets.TOKEN }}
-          USER: ${{ secrests.USER }}
+          USER: ${{ secrets.USER }}
         run: ./release.sh     
