@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-VERSION=$(<.version)
+VERSION=$(<VERSION)
 echo "Building version ${VERSION}"
 
 make_path () {
