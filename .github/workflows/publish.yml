@@ -20,5 +20,5 @@ jobs:
       - name: Upload
         env:
           TOKEN: ${{ secrets.TOKEN }}
-        run: curl -u toddself@fastmail.com:${TOKEN} -T mod.ts https://webdav.fastmail.com/toddself.fastmail.com/files/stop.computer/take-five/
-      
+          USER: ${{ secrests.USER }}
+        run: ./release.sh     
