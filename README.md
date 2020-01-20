@@ -8,7 +8,9 @@ handles CORS requests, and limits the size of a POST bodies written for Deno
 ## Usage
 
 ```js
-import {TakeFive} from 'https://static-pkg.dev/take-five/mod.ts'
+import {TakeFive} from 'https://static-pkg.dev/take-five/latest/mod.ts'
+// or
+import {TakeFive} from 'https://static-pkg.dev/take-five/{VERSION}/mod.ts'
 const five = new TakeFive()
 five.get('/', async (req, res, ctx) => ctx.send('Hello, world'))
 five.post('/', async (req, res, ctx) => ctx.send(req.body))
