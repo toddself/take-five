@@ -2,3 +2,4 @@ mod.ts
 gen
 deps
 index.html
+release.json

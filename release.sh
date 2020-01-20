@@ -1,13 +1,14 @@
 #!/bin/sh
 set -e
 VERSION=$(<.version)
+echo "Building version ${VERSION}"
 
 make_path () {
   STATUS=$(curl -X PROPFIND -o /dev/null -sw '%{http_code}' -u ${USER}:${TOKEN} ${SERVER}/${UPLOAD_PATH}/$1)
   if echo $STATUS | grep 404 > /dev/null;
   then
     echo "Making directory ${1}"
-    echo curl -X MKCOL -u ${USER}:${TOKEN} ${SERVER}/${UPLOAD_PATH}/$1
+    curl -X MKCOL -u ${USER}:${TOKEN} ${SERVER}/${UPLOAD_PATH}/$1
   else 
     echo "Directory "${1}" already exists"
   fi
@@ -22,6 +23,12 @@ render_markdown () {
   curl -u ${USER}:${TOKEN} -T index.html ${SERVER}/${UPLOAD_PATH}/${PROJECT}/${VERSION}/
 }
 
+create_release () {
+  echo "Marking release ${VERSION} on GitHub"
+  echo "{\"tag_name\":\"v${VERSION}\",\"target_commitish\":\"master\",\"name\":\"v${VERSION}\",\"body\":\"Take-Five version ${VERSION}\"}" > release.json
+  curl -u ${GH_USER}:${GH_TOKEN} -X POST https://api.github.com/repos/toddself/take-five/releases -d @release.json
+}
+
 make_path $PROJECT
 make_path $PROJECT/latest
 make_path $PROJECT/$VERSION
@@ -34,3 +41,4 @@ do
 done
 
 render_markdown
+create_release
