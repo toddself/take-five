@@ -8,7 +8,7 @@ make_path () {
   if echo $STATUS | grep 404 > /dev/null;
   then
     echo "Making directory ${1}"
-    curl -X MKCOL -u ${USER}:${TOKEN} ${SERVER}/${UPLOAD_PATH}/$1
+    curl -sX MKCOL -u ${USER}:${TOKEN} ${SERVER}/${UPLOAD_PATH}/$1
   else 
     echo "Directory "${1}" already exists"
   fi
@@ -26,7 +26,14 @@ render_markdown () {
 create_release () {
   echo "Marking release ${VERSION} on GitHub"
   echo "{\"tag_name\":\"v${VERSION}\",\"target_commitish\":\"master\",\"name\":\"v${VERSION}\",\"body\":\"Take-Five version ${VERSION}\"}" > release.json
-  curl -u ${GH_USER}:${GH_TOKEN} -sX POST https://api.github.com/repos/toddself/take-five/releases -d @release.json
+  STATUS=$(curl -u ${GH_USER}:${GH_TOKEN} -sX POST https://api.github.com/repos/toddself/${PROJECT}/releases -d @release.json -w '%{http_code}' -o output.json)
+  if echo $STATUS | grep 201 > /dev/null;
+  then
+    echo "Release generated"
+  else
+    echo "Could not make release"
+    cat output.json
+  fi
 }
 
 make_path $PROJECT
