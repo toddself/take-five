@@ -1,5 +1,7 @@
 # take-five
 
+[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Ftoddself%2Ftake-five%2Fbadge&style=flat-square)](https://actions-badge.atrox.dev/toddself/take-five/goto) 
+
 A minimal REST server that deals solely with JSON payloads, automatically
 handles CORS requests, and limits the size of a POST bodies written for Deno
 
