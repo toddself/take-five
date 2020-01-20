@@ -17,7 +17,7 @@ mod.ts: take-five.ts
 all: clean test release
 
 clean:
-		rm -f mod.ts
+		rm -f mod.ts release.json
 
 test:
 		$(foreach var,$(TEST_FILES),deno --allow-net $(var);)
