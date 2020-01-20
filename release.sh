@@ -16,7 +16,9 @@ make_path () {
 
 render_markdown () {
   echo "Rendering markdown"
-  curl -sX POST https://api.github.com/markdown -d "{\"text\": \"$(cat README.md | perl -pe 's/\n/\\n/g' | perl -pe 's/\"/\\"/g')\"}" > index.html
+  cat assets/header.html >> index.html
+  curl -sX POST https://api.github.com/markdown -d "{\"mode\":\"gfm\",\"context\":\"toddself/${PROJECT}\",\"text\": \"$(cat README.md | perl -pe 's/\n/\\n/g' | perl -pe 's/\"/\\"/g')\"}" >> index.html
+  cat assets/footer.html >> index.html
   echo "Uploading markdown to ${SERVER}/${UPLOAD_PATH}/${PROJECT}/"
   curl -u ${USER}:${TOKEN} -sT index.html ${SERVER}/${UPLOAD_PATH}/${PROJECT}/
   curl -u ${USER}:${TOKEN} -sT index.html ${SERVER}/${UPLOAD_PATH}/${PROJECT}/latest/
