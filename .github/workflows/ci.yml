@@ -1,0 +1,14 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Deno environment
+        uses: denolib/setup-deno@v1.2.0
+      - name: Run tests
+        run: make test
