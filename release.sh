@@ -26,7 +26,7 @@ render_markdown () {
 create_release () {
   echo "Marking release ${VERSION} on GitHub"
   echo "{\"tag_name\":\"v${VERSION}\",\"target_commitish\":\"master\",\"name\":\"v${VERSION}\",\"body\":\"Take-Five version ${VERSION}\"}" > release.json
-  echo curl -u ${GH_USER}:${GH_TOKEN} -sX POST https://api.github.com/repos/toddself/take-five/releases -d @release.json
+  curl -u ${GH_USER}:${GH_TOKEN} -sX POST https://api.github.com/repos/toddself/take-five/releases -d @release.json
 }
 
 make_path $PROJECT

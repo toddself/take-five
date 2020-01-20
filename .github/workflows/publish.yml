@@ -19,4 +19,6 @@ jobs:
         env:
           TOKEN: ${{ secrets.TOKEN }}
           USER: ${{ secrets.USER }}
+          GH_USER: ${{ secrets.GH_USER }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: make all
