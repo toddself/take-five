@@ -1,4 +1,4 @@
-import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT, serve, serveTLS} from 'http://deno.land/std/http/mod.ts'
+import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT, serve, serveTLS} from 'http://deno.land/std/http/server.ts'
 import {wayfarer, Emitter} from './wayfarer.ts'
 
 export {Response, ServerRequest}

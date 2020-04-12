@@ -1,9 +1,7 @@
 import {
-  test,
   assert,
   assertEquals,
-  runTests
-} from 'https://deno.land/std/testing/mod.ts'
+} from 'https://deno.land/std/testing/asserts.ts'
 
 import {TakeFive} from './take-five.ts'
 
@@ -17,7 +15,7 @@ function JSONtoForm (data: {[key: string]: string}): string {
 }
 
 function request (
-  opts: {url: string} & __domTypes.RequestInit, 
+  opts: {url: string} & __domTypes.RequestInit,
   cb: (err: Error, res?: {statusCode: number, [key: string]: any}, body?: any) => void
 ) {
   const url = opts.url
@@ -58,8 +56,8 @@ function setup (): TakeFive {
   takeFive.get('/', (req, res, ctx) => ctx.send({hello: ['world']}))
   takeFive.post('/', (req, res, ctx) => ctx.send(201, ctx.body))
   takeFive.post('/foobar', (req, res, ctx) => ctx.send(201, ctx.body))
-  takeFive.put('/:test', (req, res, ctx) => ctx.send(ctx.params))
-  takeFive.delete('/:test', (req, res, ctx) => ctx.send(ctx.query))
+  takeFive.put('/:Deno.test', (req, res, ctx) => ctx.send(ctx.params))
+  takeFive.delete('/:Deno.test', (req, res, ctx) => ctx.send(ctx.query))
   takeFive.get('/err', (req, res, ctx) => ctx.err('broken'))
   takeFive.get('/err2', (req, res, ctx) => ctx.err(400, 'bad'))
   takeFive.get('/err3', (req, res, ctx) => ctx.err(418))
@@ -92,7 +90,7 @@ function setup (): TakeFive {
 
 const tf = setup()
 
-test({
+Deno.test({
   name: 'ends response if no more paths',
   fn: async (): Promise<void> => {
     const res = await fetch('http://localhost:3000/next')
@@ -102,7 +100,7 @@ test({
   }
 })
 
-test({
+Deno.test({
 	name: 'does not call end twice',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -117,7 +115,7 @@ test({
   }
 })
 
-test({
+Deno.test({
 	name: 'not found',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -134,7 +132,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'get json',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -151,7 +149,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '500 error',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -162,13 +160,13 @@ test({
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 500, 'default is 500')
         assertEquals(body.message, 'broken', 'it is!')
-        resolve()  
+        resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: '400 error',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -184,7 +182,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '418 error',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -193,14 +191,14 @@ test({
       }
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 418, 'teapot')
-        assert(/teapot/i.test(body.message), 'short and stout')
+        assert(/teapot/i.Deno.test(body.message), 'short and stout')
         resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'custom error handler not installed',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -210,13 +208,13 @@ test({
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 500, 'internal')
         assertEquals(body.message, 'Internal server error')
-        resolve() 
+        resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'post json',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -237,7 +235,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'post not-json',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -255,7 +253,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'post global custom content type',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -271,13 +269,13 @@ test({
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 201, 'got a 201')
         assertEquals(body, '"foo=bar"', 'matches')
-        resolve()        
+        resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'post non-json with custom parser',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -299,7 +297,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'post too large with header',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -315,13 +313,13 @@ test({
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 413, 'too large')
         assertEquals(body.message, `Payload size exceeds maximum size for requests`, 'too large')
-        resolve()   
+        resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'post too large with header and custom size per route',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -343,7 +341,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'put no content',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -358,14 +356,14 @@ test({
 
       request(opts, (err, res, body) => {
         assertEquals(res.statusCode, 200, '200')
-        assertEquals(body, {test: ""}, 'get back cheeky params')
-        resolve() 
+        assertEquals(body, {Deno.test: ""}, 'get back cheeky params')
+        resolve()
       })
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'put with url params',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -377,14 +375,14 @@ test({
         }
       }
       request(opts, (err, res, body) => {
-        assertEquals(body, {test: 'foobar'}, 'params passed')
+        assertEquals(body, {Deno.test: 'foobar'}, 'params passed')
         resolve()
       })
     })
   }
 })
 
-test({
+Deno.test({
 	name: 'delete with query params',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -401,7 +399,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'options',
 	fn: (): void => {
     const opts = {
@@ -414,7 +412,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: 'teardown',
   fn: (): Promise<void> => {
     tf.close()
@@ -422,7 +420,7 @@ test({
   }
 })
 
-test({
+Deno.test({
 	name: 'full run',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -477,7 +475,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: 'body parser',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -507,7 +505,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
   name: 'changing ctx',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -540,7 +538,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: 'custom error handler',
 	fn: (): Promise<void> => {
     return new Promise((resolve) => {
@@ -571,4 +569,4 @@ test({
   }
 })
 
-runTests()
+Deno.runtests()

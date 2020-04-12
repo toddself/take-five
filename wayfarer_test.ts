@@ -1,14 +1,12 @@
 import {
-  runTests,
-  test,
   assert,
   assertEquals,
   assertThrows
-} from 'https://deno.land/std/testing/mod.ts'
+} from 'https://deno.land/std/testing/asserts.ts'
 
 import { wayfarer } from './wayfarer.ts'
 
-test({
+Deno.test({
   name: 'should match a path',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -22,8 +20,8 @@ test({
   }
 })
 
-test({
-  name: 'should match a nested path', 
+Deno.test({
+  name: 'should match a nested path',
   fn(): Promise<void> {
     return new Promise((resolve) => {
       var r = wayfarer()
@@ -36,7 +34,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: 'should match a default path',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -50,8 +48,8 @@ test({
   }
 })
 
-test({
-  name: 'should allow passing of extra values', 
+Deno.test({
+  name: 'should allow passing of extra values',
   fn (): Promise<void> {
     return new Promise((resolve) => {
       var foo = {}
@@ -67,8 +65,8 @@ test({
   }
 })
 
-test({
-  name: '.emit() should match paths', 
+Deno.test({
+  name: '.emit() should match paths',
   fn(): Promise<void> {
     let _catch = 0
     return new Promise((resolve) => {
@@ -89,7 +87,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.match() should match paths',
   fn(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -111,7 +109,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.emit() should match partials',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -125,7 +123,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.match() should match partials',
   fn(): void {
     var r = wayfarer()
@@ -135,7 +133,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.emit() should match paths before partials',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -150,7 +148,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.emit() should allow path overriding',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -168,7 +166,7 @@ test({
   }
 })
 
-test({
+Deno.test({
   name: '.emit() should match nested partials',
   fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -183,7 +181,7 @@ test({
   }
 })
 
-test({
+Deno.test({
 	name: '.emit() should parse encoded params',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -197,7 +195,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.emit() should throw if no matches are found',
 	fn(): void {
     var r1 = wayfarer()
@@ -205,7 +203,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.emit() should return values',
 	fn(): void {
     var r1 = wayfarer()
@@ -216,16 +214,16 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.emit() mount subrouters',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
       let _catch = 0
       var r4 = wayfarer()
       var r3 = wayfarer()
-      r4.on('/kidlette', function () { 
+      r4.on('/kidlette', function () {
         ++_catch
-        assert(true, 'nested 2 levels') 
+        assert(true, 'nested 2 levels')
         if (_catch === 4) resolve()
       })
       r3.on('/mom', r4)
@@ -233,9 +231,9 @@ test({
 
       var r1 = wayfarer()
       var r2 = wayfarer()
-      r2.on('/', function () { 
+      r2.on('/', function () {
         ++_catch
-        assert(true, 'nested 1 level') 
+        assert(true, 'nested 1 level')
         if (_catch === 4) resolve()
       })
       r1.on('/home', r2)
@@ -257,7 +255,7 @@ test({
       var r9 = wayfarer()
       r9.on('/bar', function (param) {
         ++_catch
-        assert(true, 'nested 3 levels') 
+        assert(true, 'nested 3 levels')
         if (_catch === 4) resolve()
       })
       r8.on('/bin', r9)
@@ -267,7 +265,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.emit() should match nested partials of subrouters',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -287,7 +285,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.match() should return nested partials of subrouters',
 	fn(): void {
     var r1 = wayfarer()
@@ -303,7 +301,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: '.match() returns a handler of a route',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -318,7 +316,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'nested routes should call parent default route',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -343,7 +341,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'aliases',
 	fn(): void {
     var r = wayfarer()
@@ -351,7 +349,7 @@ test({
   }
 })
 
-test({
+Deno.test({
 	name: 'wildcards',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -377,7 +375,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'wildcards dont conflict with params',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -424,13 +422,13 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'safe decodeURIComponent',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
       let _catch = 0
       var r = wayfarer('/404')
-      r.on('/test/:id', function (params) {
+      r.on('/Deno.test/:id', function (params) {
         ++_catch
         assert(false, 'we should not be here')
         if (_catch === 2) resolve()
@@ -440,18 +438,18 @@ test({
         assert(true, 'called')
         if (_catch === 2) resolve()
       })
-      r('/test/hel%"Flo')
+      r('/Deno.test/hel%"Flo')
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'safe decodeURIComponent - nested route',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
       let _catch = 0
       var r = wayfarer('/404')
-      r.on('/test/hello/world/:id/blah', function (params) {
+      r.on('/Deno.test/hello/world/:id/blah', function (params) {
         ++_catch
         assert(false, 'we should not be here')
         if (_catch === 2) resolve()
@@ -461,18 +459,18 @@ test({
         assert(true, 'called')
         if (_catch === 2) resolve()
       })
-      r('/test/hello/world/hel%"Flo/blah')
+      r('/Deno.test/hello/world/hel%"Flo/blah')
     })
   }
 })
 
-test({
+Deno.test({
 	name: 'safe decodeURIComponent - wildcard',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
       let _catch = 0
       var r = wayfarer('/404')
-      r.on('/test/*', function (params) {
+      r.on('/Deno.test/*', function (params) {
         ++_catch
         assert(false, 'we should not be here')
         if (_catch === 2) resolve()
@@ -482,12 +480,12 @@ test({
         assert(true, 'called')
         if (_catch === 2) resolve()
       })
-      r('/test/hel%"Flo')
+      r('/Deno.test/hel%"Flo')
     })
 	}
 })
 
-test({
+Deno.test({
 	name: 'should expose .route property',
 	fn(): void {
     var r = wayfarer()
@@ -496,7 +494,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'should be called with self',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -510,7 +508,7 @@ test({
 	}
 })
 
-test({
+Deno.test({
 	name: 'can register callback on many routes',
 	fn(): Promise<void> {
     return new Promise((resolve) => {
@@ -534,4 +532,4 @@ test({
 	}
 })
 
-runTests()
+await Deno.runTests()
