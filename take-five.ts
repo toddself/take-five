@@ -1,7 +1,8 @@
-import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT, serve, serveTLS} from 'http://deno.land/std/http/server.ts'
-import {wayfarer, Emitter} from './wayfarer.ts'
+import * as http from 'http'
+import * as https from 'https'
+import * as querystring from 'querystring'
 
-export {Response, ServerRequest}
+import {wayfarer, Emitter} from './wayfarer'
 
 const dataMethods = ['put', 'post', 'patch']
 const methods = ['get', 'put', 'post', 'delete', 'patch']
@@ -12,7 +13,7 @@ const CREDENTIALS = true
 const ALLOWED_TYPES = ['application/json']
 const HEADERS = ['Content-Type', 'Accept', 'X-Requested-With']
 
-export type Encoder = (content: string, route: string) => any
+export type Encoder = (content: Buffer, route: string) => any
 export type Decoder = (content: any, route: string) => string
 
 interface Parser {
@@ -46,26 +47,28 @@ export interface TakeFiveContext {
   send: (code: any, content?: any) => Promise<void>
   err: (code: any, content?: any) => Promise<void>
   body?: any
-  finished: boolean
   maxPost?: number,
   allowContentTypes?: string[]
-  query: {
-    [key: string]: string
-  },
+  query: querystring.ParsedUrlQuery,
   params: {
     [key: string]: string
   }
   [key: string]: any
 }
 
-export type ErrorHandler = (err: Error, req: ServerRequest, res: Response, ctx: TakeFiveContext) => void
-export type RouteHandler = (req: ServerRequest, res: Response, ctx: TakeFiveContext) => Promise<void>
+export type ErrorHandler = (err: Error, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) => void
+export type RouteHandler = (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) => Promise<void>
 
 type MatcherFunction = (
   route: string,
   cb: RouteHandler | RouteHandler[],
   ctxOpts?: {[key: string]: any}
 ) => void
+
+function getHeader (r: http.ServerResponse | http.ClientRequest, headerName: string): string {
+  const header = r.getHeader(headerName)
+  return String(Array.isArray(header) ? header[0] : header)
+}
 
 export interface TakeFive {
   get: MatcherFunction
@@ -81,7 +84,7 @@ export class TakeFive {
   allowOrigin: string
   allowCredentials: boolean
   routers: Map<string, Emitter>
-  server: Server
+  server: http.Server | https.Server
   methods: string[]
   handleError: ErrorHandler
 
@@ -90,7 +93,7 @@ export class TakeFive {
   private _allowContentTypes: string[] = ALLOWED_TYPES.slice(0)
   private parsers: ParserList = {
     'application/json': {
-      toStructure: (content) => JSON.parse(content),
+      toStructure: (content) => JSON.parse(content.toString('utf8')),
       toString: (data) => JSON.stringify(data)
     }
   }
@@ -127,20 +130,19 @@ export class TakeFive {
     if (port) {
       this._httpOpts.port = port
     }
-    let protocol = 'http://'
     let addr = this._httpOpts.addr || 'localhost'
 
     if (this._httpOpts.keyFile && this._httpOpts.certFile) {
-      this.server = serveTLS(this._httpOpts as HTTPSOptions)
-      protocol = 'https://'
+      this.server = https.createServer({
+        key: this._httpOpts.keyFile,
+        cert: this._httpOpts.certFile
+      })
     } else {
-      this.server = serve(this._httpOpts)
+      this.server = http.createServer()
     }
 
-    this._urlBase = `${protocol}${addr}:${this._httpOpts.port}`
-    for await (const request of this.server) {
-      this._onRequest(request)
-    }
+    this.server.on('request', (req, res) => this._onRequest(req, res))
+    this.server.listen(this._httpOpts.port, addr)
   }
 
   set allowContentTypes (types: string | string[]) {
@@ -186,7 +188,7 @@ export class TakeFive {
     return this._ctx
   }
 
-  parseBody (data: string, type: string, route: string): any {
+  parseBody (data: Buffer, type: string, route: string): any {
     const parser = this.parsers[type]
     if (parser && typeof parser.toStructure === 'function') {
       return parser.toStructure(data, route)
@@ -194,128 +196,134 @@ export class TakeFive {
     return data
   }
 
-  makeCtx (req: ServerRequest, res: Response) {
-    const send = async (code: any, content?: any) => {
-      if (typeof content === 'undefined') {
-        content = code
-        code = 200
-      }
-      const isUint8 = Object.prototype.toString.call(content) === '[object Uint8Array]'
-
-      if (typeof content !== 'string' && !isUint8) {
-        if (res.headers.has('Content-Type')) {
-          const parser = this.parsers[res.headers.get('Content-Type')]
-          content = parser.toString(content, req.url)
-        } else {
-          res.headers.append('Content-Type', 'application/json')
-          content = this.parsers['application/json'].toString(content, req.url)
-        }
-      }
-
-      res.status = code
-      res.body = isUint8 ? content : new TextEncoder().encode(content) 
-      return req.respond(res)
-    }
-
-    async function err (code: any, content?: any) {
-      const e = new Error()
-      if (typeof content === 'undefined') {
-        if (parseInt(code, 10)) {
-          content = STATUS_TEXT.get(code)
-        } else {
+  makeCtx (req: http.ClientRequest, res: http.ServerResponse) {
+    const send = (code: any, content?: any): Promise<void> => {
+      return new Promise((resolve) => {
+        if (typeof content === 'undefined') {
           content = code
-          code = 500
+          code = 200
         }
-      }
 
-      const message = JSON.stringify({message: content})
-      res.status = code
-      res.headers.append('Content-Type', 'application/json')
-      res.body = new TextEncoder().encode(message)
-      return req.respond(res)
+        if (typeof content !== 'string') {
+          if (res.hasHeader('Content-Type')) {
+            const dataType = getHeader(res, 'content-type')
+            const parser = this.parsers[dataType]
+            content = parser.toString(content, req.path)
+          } else {
+            res.setHeader('Content-Type', 'application/json')
+            content = this.parsers['application/json'].toString(content, req.path)
+          }
+        }
+
+        res.statusCode = code
+        req.end(content, 'utf8', resolve)
+      })
     }
 
-    return Object.assign({}, this.ctx, {send, err, finished: false})
+    function err (code: any, content?: any): Promise<void> {
+      return new Promise((resolve) => {
+        if (typeof content === 'undefined') {
+          if (parseInt(code, 10)) {
+            content = http.STATUS_CODES[code]
+          } else {
+            content = code
+            code = 500
+          }
+        }
+
+        const message = JSON.stringify({message: content})
+        res.statusCode = code
+        res.setHeader('Content-Type', 'application/json')
+        res.end(message, 'utf8', resolve)
+      })
+    }
+
+    return Object.assign({}, this.ctx, {send, err})
   }
 
-  _handleError (err: Error, req: ServerRequest, res: Response, ctx: TakeFiveContext) {
+  _handleError (err: Error, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) {
     if (typeof this.handleError === 'function') {
       this.handleError(err, req, res, ctx)
     }
 
-    if (!ctx.finished) {
+    if (!req.writableEnded) {
       ctx.err('Internal server error')
     }
   }
 
-  cors (res: Response) {
-    res.headers.append('Access-Control-Allow-Origin', this.allowOrigin)
-    res.headers.append('Access-Control-Allow-Headers', this._allowHeaders.join(','))
-    res.headers.append('Access-Control-Allow-Credentials', String(this.allowCredentials))
-    res.headers.append('Access-Control-Allow-Methods', this._allowMethods.join(',').toUpperCase())
+  cors (res: http.ServerResponse) {
+    res.setHeader('Access-Control-Allow-Origin', this.allowOrigin)
+    res.setHeader('Access-Control-Allow-Headers', this._allowHeaders.join(','))
+    res.setHeader('Access-Control-Allow-Credentials', String(this.allowCredentials))
+    res.setHeader('Access-Control-Allow-Methods', this._allowMethods.join(',').toUpperCase())
   }
 
   close () {
     return this.server.close()
   }
 
-  async _verifyBody (req: ServerRequest, res: Response, ctx: TakeFiveContext): Promise<void> {
-    const type = req.headers.get('Content-Type')
-    const size = req.contentLength
-    const _ctxMax = parseInt(String(ctx.maxPost), 10)
-    const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax 
+  _verifyBody (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const type = getHeader(res, 'content-type')
+      const size = parseInt(getHeader(res, 'content-length') || undefined, 10)
+      const _ctxMax = parseInt(String(ctx.maxPost), 10)
+      const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax
 
-    let allowContentTypes = this._allowContentTypes.slice(0)
-    if (ctx.allowContentTypes) {
-      allowContentTypes = allowContentTypes.concat(ctx.allowContentTypes)
-    }
-
-    if (size > maxPost) {
-      return ctx.err(413, 'Payload size exceeds maximum size for requests')
-    }
-
-    if (!allowContentTypes.includes(type)) {
-      return ctx.err(415, `Expected data to be of ${allowContentTypes.join(', ')} not ${type}`)
-    } else {
-      const buf = new Uint8Array(req.contentLength);
-      let bufSlice = buf;
-      let totRead = 0;
-      while (true) {
-        const nread = await req.body.read(bufSlice)
-        if (nread === Deno.EOF) break
-        totRead += nread
-        if (totRead >= req.contentLength) break
-        bufSlice = bufSlice.subarray(nread)
+      let allowContentTypes = this._allowContentTypes.slice(0)
+      if (ctx.allowContentTypes) {
+        allowContentTypes = allowContentTypes.concat(ctx.allowContentTypes)
       }
-      try {
-        ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type, req.url)
-      } catch (err) {
-        ctx.finished = true
-        ctx.err(400, `Payload is not valid ${type}`)
+
+      if (Number.isNaN(size)) {
+        const err = new Error('Content-Length is a required header and not supplied')
+        ctx.err(411, 'Content-Length is required')
+        return reject(err)
       }
-    }
+
+      if (!Number.isNaN(size) && size > maxPost) {
+        return ctx.err(413, 'Payload size exceeds maximum size for requests')
+      }
+
+      if (!allowContentTypes.includes(type)) {
+        return ctx.err(415, `Expected data to be of ${allowContentTypes.join(', ')} not ${type}`)
+      } else {
+        const data = []
+        req.on('data', (chunk) => {
+          data.push(chunk)
+        })
+
+        req.on('abort', () => {
+          const err = new Error('Client aborted request')
+          reject(err)
+        })
+
+        req.on('error', reject)
+        req.on('end', () => {
+          const reqData = Buffer.from([].concat(data))
+          ctx.body = this.parseBody(reqData, type, req.path)
+          resolve()
+        })
+      }
+    })
   }
 
-  _onRequest (req: ServerRequest) {
-    const res: Response = {
-      headers: new Headers()
-    }
+  _onRequest (req: http.ClientRequest, res: http.ServerResponse) {
     this.cors(res)
 
     if (req.method === 'OPTIONS') {
-      res.status = 204
-      return req.respond(res)
+      res.statusCode = 204
+      return res.end()
     }
 
     const ctx = this.makeCtx(req, res)
 
     try {
       const method = req.method.toLowerCase()
-      const url = req.url.split('?')[0]
+      const url = req.path.split('?')[0]
       const router = this.routers.get(method)
       router(url, req, res, ctx)
     } catch (err) {
-      if (ctx.finished) {
+      if (req.writableEnded) {
         throw err
       }
       return ctx.err(404, 'Not found')
@@ -341,16 +349,16 @@ export class TakeFive {
           throw new Error('handlers must be functions')
         }
 
-        router.on(matcher, (params: {[key: string]: any}, req: ServerRequest, res: Response, ctx: TakeFiveContext): void => {
+        router.on(matcher, (params: {[key: string]: any}, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext): void => {
           const routeHandlers = handlers.slice(0)
 
-          const conlen = parseInt(req.headers.get('Content-Length'), 10) || 0
+          const conlen = parseInt(getHeader(req, 'Content-Length'), 10) || 0
           if (conlen !== 0 && dataMethods.includes(req.method.toLowerCase())) {
             if (ctxOpts) ctx = Object.assign({}, ctx, ctxOpts)
             routeHandlers.unshift(this._verifyBody.bind(this))
           }
 
-          ctx.query = Object.fromEntries((new URL(req.url, this._urlBase)).searchParams)
+          ctx.query = querystring.parse(req.path.split('?')[1])
           ctx.params = params
           this._resolveHandlers(req, res, ctx, routeHandlers)
         })
@@ -362,12 +370,12 @@ export class TakeFive {
     })
   }
 
-  _resolveHandlers (req: ServerRequest, res: Response, ctx: TakeFiveContext, handlers: RouteHandler[]) {
+  _resolveHandlers (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext, handlers: RouteHandler[]) {
     const iterate = (handler: RouteHandler) => {
       const p = handler(req, res, ctx)
       if (p && typeof p.then === 'function') {
         p.then(() => {
-          if (!ctx.finished && handlers.length > 0) {
+          if (!req.writableEnded && handlers.length > 0) {
             const next = handlers.shift()
             iterate(next)
           }
