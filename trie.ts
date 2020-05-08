@@ -15,12 +15,12 @@ export interface TrieNode {
   }
 }
 
-export const paramSym = Symbol()
+export const paramSym = Symbol('para')
 
 export interface TrieInterface {
   create: (route: string) => TrieNode
   match: (route: string) => TrieNode
-  mount: (route: string, node: TrieNode) => void 
+  mount: (route: string, node: TrieNode) => void
   trie: TrieNode
 }
 
@@ -65,12 +65,12 @@ export class Trie implements TrieInterface {
       delete node.nodes[''].nodes
     }
   }
-   
+
   private splitRoutes (route: string): string[] {
     const leadingSlashRE = /^\//
     return route.replace(leadingSlashRE, '').split('/')
   }
-  
+
   private search (routes: string[], index: number, trie: TrieNode, params: Params): TrieNode {
     if (typeof trie === 'undefined') return
     if (routes.length === 0) return trie
@@ -99,7 +99,7 @@ export class Trie implements TrieInterface {
   }
 
   private createNode (routes: string[], index: number, trie: TrieNode): TrieNode {
-    if (routes.length === 0) return trie  
+    if (routes.length === 0) return trie
     const route = routes.shift()
 
     let node = {nodes: {}}

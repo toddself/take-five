@@ -1,11 +1,11 @@
-import {
-  assert,
-  assertEquals,
-} from 'https://deno.land/std/testing/asserts.ts'
+import { test } from 'tap'
+import * as assert from 'assert'
+import { nanorequest } from 'nanorequest'
 
-import {TakeFive} from './take-five.ts'
+import { TakeFive } from './take-five'
 
-function formToJSON (data: string): {[key: string]: string} {
+function formToJSON (buf: Buffer): {[key: string]: string} {
+  const data = buf.toString('utf8')
   const [key, val] = data.split('=')
   return {[key]: val}
 }
@@ -15,12 +15,10 @@ function JSONtoForm (data: {[key: string]: string}): string {
 }
 
 function request (
-  opts: {url: string} & __domTypes.RequestInit,
+  opts: {url: string},
   cb: (err: Error, res?: {statusCode: number, [key: string]: any}, body?: any) => void
 ) {
-  const url = opts.url
-  delete opts.url
-  fetch(url, opts)
+  nanorequest(opts)
     .then(res => {
       const response = {
         statusCode: res.status,
@@ -67,22 +65,20 @@ function setup (): TakeFive {
 
   takeFive.get('/next', [
     async (req, res, ctx) => {
-      res.status = 202
-      res.headers.set('Content-Type', 'application/json')
+      res.statusCode = 202
+      res.setHeader('Content-Type', 'application/json')
     },
-    (req, res, ctx) => {
-      res.body = new TextEncoder().encode('{"message": "complete"}')
-      return req.respond(res)
+    async (req, res, ctx) => {
+      return res.end('{"message": "complete"}')
     }
   ])
 
   takeFive.get('/end', [
     async (req, res, ctx) => {
-      res.status = 418
-      res.body = new TextEncoder().encode('Yo')
-      return req.respond(res)
+      res.statusCode = 418
+      return res.end('Yo')
     },
-    async (req, res, ctx) => assert(false, 'should never get called')
+    async (req, res, ctx) => assert.fail('should never get called')
   ])
 
   return takeFive
@@ -90,29 +86,23 @@ function setup (): TakeFive {
 
 const tf = setup()
 
-Deno.test({
-  name: 'ends response if no more paths',
-  fn: async (): Promise<void> => {
-    const res = await fetch('http://localhost:3000/next')
-    const data = await res.json()
-    assertEquals(res.status, 202, 'got back a 202')
-    assertEquals(data.message, 'complete', 'got json with complete')
-  }
+test('ends response if no more paths',async (): Promise<void> => {
+  const res = await fetch('http://localhost:3000/next')
+  const data = await res.json()
+  assertEquals(res.status, 202, 'got back a 202')
+  assertEquals(data.message, 'complete', 'got json with complete')
 })
 
-Deno.test({
-	name: 'does not call end twice',
-	fn: (): Promise<void> => {
+test('does not call end twice',(): Promise<void> => {
     return new Promise((resolve) => {
       const opts = {
         url: 'http://localhost:3000/end'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 418, 'teapot')
-        resolve()
-      })
+      assertEquals(res.statusCode, 418, 'teapot')
+      resolve()
     })
-  }
+  })
 })
 
 Deno.test({

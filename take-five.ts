@@ -2,7 +2,7 @@ import * as http from 'http'
 import * as https from 'https'
 import * as querystring from 'querystring'
 
-import {wayfarer, Emitter} from './wayfarer'
+import {wayfarer, WayfarerEmitter} from './wayfarer'
 
 const dataMethods = ['put', 'post', 'patch']
 const methods = ['get', 'put', 'post', 'delete', 'patch']
@@ -83,7 +83,7 @@ export class TakeFive {
   allowedContentTypes: string[]
   allowOrigin: string
   allowCredentials: boolean
-  routers: Map<string, Emitter>
+  routers: Map<string, WayfarerEmitter>
   server: http.Server | https.Server
   methods: string[]
   handleError: ErrorHandler
@@ -121,7 +121,7 @@ export class TakeFive {
     this._ctx = ({} as TakeFiveContext)
     this._httpOpts = opts.http || {} as HTTPOptions
 
-    this.routers = new Map<string, Emitter>()
+    this.routers = new Map<string, WayfarerEmitter>()
     this.methods = methods.concat(opts.methods || [])
     this._addRouters()
   }

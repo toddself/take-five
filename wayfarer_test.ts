@@ -1,535 +1,373 @@
-import {
-  assert,
-  assertEquals,
-  assertThrows
-} from 'https://deno.land/std/testing/asserts.ts'
+import { test } from 'tap'
+import { wayfarer } from './wayfarer'
 
-import { wayfarer } from './wayfarer.ts'
-
-Deno.test({
-  name: 'should match a path',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/', function () {
-        assert(true, 'called')
-        resolve()
-      })
-      r('/')
-    })
-  }
+test('should match a path', (t): void => {
+  var r = wayfarer()
+  r.on('/', function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  r('/')
 })
 
-Deno.test({
-  name: 'should match a nested path',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/foo/bar', function () {
-        assert(true, 'called')
-        resolve()
-      })
-      r('/foo/bar')
-    })
-  }
+test('should match a default path', (t): void => {
+  var r = wayfarer()
+  r.on(void 0, function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  r('/')
 })
 
-Deno.test({
-  name: 'should match a default path',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer('/404')
-      r.on('/404', function () {
-        assert(true, 'default')
-        resolve()
-      })
-      r('/nope')
-    })
-  }
+test('should match a nested path', (t): void => {
+  var r = wayfarer()
+  r.on('/foo/bar', function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  r('/foo/bar')
 })
 
-Deno.test({
-  name: 'should allow passing of extra values',
-  fn (): Promise<void> {
-    return new Promise((resolve) => {
-      var foo = {}
-      var bar = {}
-      var r = wayfarer()
-      r.on('/foo', function (params, arg1, arg2) {
-        assertEquals(arg1, foo, 'arg1 was passed')
-        assertEquals(arg2, bar, 'arg2 was passed')
-        resolve()
-      })
-      r('/foo', foo, bar)
-    })
-  }
+test('should match a default path', (t): void => {
+  var r = wayfarer('/404')
+  r.on('/404', function () {
+    t.ok(true, 'default')
+    t.end()
+  })
+  r('/nope')
 })
 
-Deno.test({
-  name: '.emit() should match paths',
-  fn(): Promise<void> {
-    let _catch = 0
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/foo/bar', function (param) {
-        ++_catch
-        assert(true, 'bar called')
-        if (_catch === 2) resolve()
-      })
-      r.on('/foo/baz', function (param) {
-        ++_catch
-        assert(true, 'baz called')
-        if (_catch === 2) resolve()
-      })
-      r('/foo/bar')
-      r('/foo/baz')
-    })
-  }
-})
-
-Deno.test({
-  name: '.match() should match paths',
-  fn(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      var r = wayfarer()
-      r.on('/foo/bar', function () {
-        assert(false, 'should not call callback')
-        reject()
-      })
-
-      r.on('/foo/baz', () => {})
-
-      var bar = r.match('/foo/bar')
-      assertEquals(bar.route, '/foo/bar', '/foo/bar route exists')
-
-      var baz = r.match('/foo/baz')
-      assertEquals(baz.route, '/foo/baz', '/foo/baz route exists')
-      setTimeout(resolve, 1)
-    })
-  }
-})
-
-Deno.test({
-  name: '.emit() should match partials',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/:user', function (param) {
-        assertEquals(param.user, 'tobi', 'param matched')
-        resolve()
-      })
-      r('/tobi')
-    })
-  }
-})
-
-Deno.test({
-  name: '.match() should match partials',
-  fn(): void {
+test('should allow passing of extra values', (t): void => {
+    var foo = {}
+    var bar = {}
     var r = wayfarer()
-    r.on('/:user', () => {})
-    var toby = r.match('/tobi')
-    assertEquals(toby.params.user, 'tobi')
+    r.on('/foo', function (params, arg1, arg2) {
+      t.deepEqual(arg1, foo, 'arg1 was passed')
+      t.deepEqual(arg2, bar, 'arg2 was passed')
+      t.end()
+    })
+    r('/foo', foo, bar)
+})
+
+test('.emit() should match paths', (t): void => {
+  t.plan(2)
+  var r = wayfarer()
+  r.on('/foo/bar', function (param) {
+    t.ok(true, 'bar called')
+  })
+  r.on('/foo/baz', function (param) {
+    t.ok(true, 'baz called')
+  })
+  r('/foo/bar')
+  r('/foo/baz')
+})
+
+test('.match() should match paths', (t): void => {
+  t.plan(2)
+  var r = wayfarer()
+  r.on('/foo/bar', function () {
+    t.fail('should not call callback')
+  })
+
+  r.on('/foo/baz', () => {})
+
+  var bar = r.match('/foo/bar')
+  t.deepEqual(bar.route, '/foo/bar', '/foo/bar route exists')
+
+  var baz = r.match('/foo/baz')
+  t.deepEqual(baz.route, '/foo/baz', '/foo/baz route exists')
+})
+
+test('.emit() should match partials', (t): void => {
+  var r = wayfarer()
+  r.on('/:user', function (param) {
+    t.deepEqual(param.user, 'tobi', 'param matched')
+    t.end()
+  })
+  r('/tobi')
+})
+
+test('.match() should match partials', (t): void => {
+  var r = wayfarer()
+  r.on('/:user', () => {})
+  var toby = r.match('/tobi')
+  t.deepEqual(toby.params.user, 'tobi')
+  t.end()
+})
+
+test('.emit() should match paths before partials', (t): void => {
+  var r = wayfarer()
+  r.on('/foo', function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  r.on('/:user', () => {})
+  r('/foo')
+})
+
+test('.emit() should allow path overriding', (t): void => {
+  var r = wayfarer()
+  r.on('/:user', function () {
+    t.fail('wrong callback called')
+  })
+  r.on('/:user', function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  r('/foo')
+})
+
+test('.emit() should match nested partials', (t): void => {
+  var r = wayfarer()
+  r.on('/:user/:name', function (param) {
+    t.deepEqual(param.user, 'tobi', 'param matched')
+    t.deepEqual(param.name, 'baz', 'param matched')
+    t.end()
+  })
+  r('/tobi/baz')
+})
+
+test('.emit() should parse encoded params', (t): void => {
+  var r = wayfarer()
+  r.on('/:channel', function (param) {
+    t.deepEqual(param.channel, '#choo', 'param matched')
+    t.end()
+  })
+  r('/%23choo')
+})
+
+test('.emit() should throw if no matches are found', (t): void => {
+  var r1 = wayfarer()
+  t.throws(() =>{
+    r1('/woops')
+  })
+  t.end()
+})
+
+test('.emit() should return values', (t): void => {
+  var r1 = wayfarer()
+  r1.on('/foo', function () {
+    return 'hello'
+  })
+  t.deepEqual(r1('foo'), 'hello', 'returns value')
+  t.end()
+})
+
+test('.emit() mount subrouters', (t): void => {
+  t.plan(5)
+  var r4 = wayfarer()
+  var r3 = wayfarer()
+  r4.on('/kidlette', function () {
+    t.ok(true, 'nested 2 levels')
+  })
+  r3.on('/mom', r4)
+  r3.emit('/mom/kidlette')
+
+  var r1 = wayfarer()
+  var r2 = wayfarer()
+  r2.on('/', function () {
+    t.ok(true, 'nested 1 level')
+  })
+  r1.on('/home', r2)
+  r1('/home')
+
+  var r5 = wayfarer()
+  var r6 = wayfarer()
+  r6.on('/child', function (param) {
+    t.deepEqual(typeof param, 'object', 'param is passed')
+    t.deepEqual(param.parent, 'hello', 'nested 2 levels with params')
+  })
+  r5.on('/:parent', r6)
+  r5.emit('/hello/child')
+
+  var r7 = wayfarer()
+  var r8 = wayfarer()
+  var r9 = wayfarer()
+  r9.on('/bar', function (param) {
+    t.ok(true, 'nested 3 levels')
+  })
+  r8.on('/bin', r9)
+  r7.on('/foo', r8)
+  r7.emit('/foo/bin/bar')
+})
+
+test('.emit() should match nested partials of subrouters', (t): void => {
+  var r1 = wayfarer()
+  var r2 = wayfarer()
+  var r3 = wayfarer()
+  r3.on('/:grandchild', function (param) {
+    t.deepEqual(param.parent, 'bin', 'nested 3 levels with params')
+    t.deepEqual(param.child, 'bar', 'nested 3 levels with params')
+    t.deepEqual(param.grandchild, 'baz', 'nested 3 levels with parmas')
+    t.end()
+  })
+  r2.on('/:child', r3)
+  r1.on('/foo/:parent', r2)
+  r1('/foo/bin/bar/baz')
+})
+
+test('.match() should return nested partials of subrouters', (t): void => {
+  var r1 = wayfarer()
+  var r2 = wayfarer()
+  var r3 = wayfarer()
+  r3.on('/:grandchild', () => {})
+  r2.on('/:child', r3)
+  r1.on('/foo/:parent', r2)
+  var matched = r1.match('/foo/bin/bar/baz')
+  t.deepEqual(matched.params.parent, 'bin')
+  t.deepEqual(matched.params.child, 'bar')
+  t.deepEqual(matched.params.grandchild, 'baz')
+  t.end()
+})
+
+test('.match() returns a handler of a route', (t): void => {
+  var r = wayfarer()
+  r.on('/:user', function () {
+    t.ok(true, 'called')
+    t.end()
+  })
+  var toby = r.match('/tobi')
+  toby.cb()
+})
+
+test('nested routes should call parent default route', (t): void => {
+  t.plan(4)
+  var r1 = wayfarer('/404')
+  var r2 = wayfarer()
+  var r3 = wayfarer()
+
+  r2.on('/bar', r3)
+  r1.on('foo', r2)
+  r1.on('/404', pass)
+
+  r1('')
+  r1('foo')
+  r1('foo/bar')
+  r1('foo/beep/boop')
+
+  function pass (params) {
+    t.ok(true, 'called')
   }
 })
 
-Deno.test({
-  name: '.emit() should match paths before partials',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/foo', function () {
-        assert(true, 'called')
-        resolve()
-      })
-      r.on('/:user', () => {})
-      r('/foo')
-    })
+test('aliases', (t): void => {
+  var r = wayfarer()
+  t.deepEqual(r, r)
+  t.end()
+})
+
+test('wildcards', (t): void => {
+  t.plan(3)
+  var r = wayfarer()
+
+  r.on('/bar/*', function (params) {
+    t.deepEqual(params.wildcard, 'foo/beep/boop')
+  })
+
+  r.on('/foo/:match/*', function (params) {
+    t.deepEqual(params.match, 'bar')
+    t.deepEqual(params.wildcard, 'beep/boop')
+  })
+
+  r('/bar/foo/beep/boop')
+  r('/foo/bar/beep/boop')
+})
+
+test('wildcards dont conflict with params', (t): void => {
+  t.plan(3)
+  let router = wayfarer()
+  router.on('/*', function (params) {
+    t.fail('wildcard called')
+  })
+  router.on('/:match', function (params) {
+    t.ok(true, 'param called')
+  })
+  router('/foo')
+
+  router = wayfarer()
+  router.on('/*', function (params) {
+    t.fail('wildcard called')
+  })
+  router.on('/:match/foo', function (params) {
+    t.ok(true, 'param called')
+  })
+  router('/foo/foo')
+
+  router = wayfarer()
+  router.on('/*', function (params) {
+    t.ok(true, 'wildcard called')
+  })
+  router.on('/:match/foo', function (params) {
+    t.fail('param called')
+  })
+  router('/foo/bar')
+})
+
+test('safe decodeURIComponent', (t): void => {
+  t.plan(1)
+  var r = wayfarer('/404')
+  r.on('/test/:id', function (params) {
+    t.fail('we should not be here')
+  })
+  r.on('/404', function () {
+    t.ok(true, 'called')
+  })
+  r('/test/hel%"Flo')
+})
+
+test('safe decodeURIComponent - nested route', (t): void => {
+  t.plan(1)
+  var r = wayfarer('/404')
+  r.on('/test/hello/world/:id/blah', function (params) {
+    t.fail('we should not be here')
+  })
+  r.on('/404', function () {
+    t.ok(true, 'called')
+  })
+  r('/test/hello/world/hel%"Flo/blah')
+})
+
+test('safe decodeURIComponent - wildcard', (t): void => {
+  t.plan(1)
+  var r = wayfarer('/404')
+  r.on('/test/*', function (params) {
+    t.fail('we should not be here')
+  })
+  r.on('/404', function () {
+    t.ok(true, 'called')
+  })
+  r('/test/hel%"Flo')
+})
+
+test('should expose .route property', (t): void => {
+  var r = wayfarer()
+  r.on('/foo', function () {})
+  t.deepEqual(r.match('/foo').route, '/foo', 'exposes route property')
+  t.end()
+})
+
+test('should be called with self', (t): void => {
+  var r = wayfarer()
+  r.on('/foo', function callback () {
+    t.deepEqual(this, callback, 'calling context is self')
+    t.end()
+  })
+  r('/foo')
+})
+
+test('can register callback on many routes', (t): void => {
+  t.plan(6)
+  var r = wayfarer()
+  var routes = ['/foo', '/bar']
+  r.on('/foo', callback)
+  r.on('/bar', callback)
+  for (var i = 0, len = routes.length, matched; i < len; i++) {
+    matched = r.match(routes[i])
+    t.deepEqual(matched.cb, callback, 'matched callback is same')
+    t.deepEqual(matched.route, routes[i], 'matched route is same')
+    r(routes[i])
+  }
+  function callback () {
+    t.deepEqual(this, callback, 'calling context is same')
   }
 })
-
-Deno.test({
-  name: '.emit() should allow path overriding',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/:user', function () {
-        assert(false, 'wrong callback called')
-        resolve()
-      })
-      r.on('/:user', function () {
-        assert(true, 'called')
-        resolve()
-      })
-      r('/foo')
-    })
-  }
-})
-
-Deno.test({
-  name: '.emit() should match nested partials',
-  fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/:user/:name', function (param) {
-        assertEquals(param.user, 'tobi', 'param matched')
-        assertEquals(param.name, 'baz', 'param matched')
-        resolve()
-      })
-      r('/tobi/baz')
-    })
-  }
-})
-
-Deno.test({
-	name: '.emit() should parse encoded params',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/:channel', function (param) {
-        assertEquals(param.channel, '#choo', 'param matched')
-        resolve()
-      })
-      r('/%23choo')
-    })
-	}
-})
-
-Deno.test({
-	name: '.emit() should throw if no matches are found',
-	fn(): void {
-    var r1 = wayfarer()
-    assertThrows(r1.bind(r1, '/woops'))
-	}
-})
-
-Deno.test({
-	name: '.emit() should return values',
-	fn(): void {
-    var r1 = wayfarer()
-    r1.on('/foo', function () {
-      return 'hello'
-    })
-    assertEquals(r1('foo'), 'hello', 'returns value')
-	}
-})
-
-Deno.test({
-	name: '.emit() mount subrouters',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r4 = wayfarer()
-      var r3 = wayfarer()
-      r4.on('/kidlette', function () {
-        ++_catch
-        assert(true, 'nested 2 levels')
-        if (_catch === 4) resolve()
-      })
-      r3.on('/mom', r4)
-      r3('/mom/kidlette')
-
-      var r1 = wayfarer()
-      var r2 = wayfarer()
-      r2.on('/', function () {
-        ++_catch
-        assert(true, 'nested 1 level')
-        if (_catch === 4) resolve()
-      })
-      r1.on('/home', r2)
-      r1('/home')
-
-      var r5 = wayfarer()
-      var r6 = wayfarer()
-      r6.on('/child', function (param) {
-        ++_catch
-        assertEquals(typeof param, 'object', 'param is passed')
-        assertEquals(param.parent, 'hello', 'nested 2 levels with params')
-        if (_catch === 4) resolve()
-      })
-      r5.on('/:parent', r6)
-      r5('/hello/child')
-
-      var r7 = wayfarer()
-      var r8 = wayfarer()
-      var r9 = wayfarer()
-      r9.on('/bar', function (param) {
-        ++_catch
-        assert(true, 'nested 3 levels')
-        if (_catch === 4) resolve()
-      })
-      r8.on('/bin', r9)
-      r7.on('/foo', r8)
-      r7('/foo/bin/bar')
-    })
-	}
-})
-
-Deno.test({
-	name: '.emit() should match nested partials of subrouters',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r1 = wayfarer()
-      var r2 = wayfarer()
-      var r3 = wayfarer()
-      r3.on('/:grandchild', function (param) {
-        assertEquals(param.parent, 'bin', 'nested 3 levels with params')
-        assertEquals(param.child, 'bar', 'nested 3 levels with params')
-        assertEquals(param.grandchild, 'baz', 'nested 3 levels with parmas')
-        resolve()
-      })
-      r2.on('/:child', r3)
-      r1.on('/foo/:parent', r2)
-      r1('/foo/bin/bar/baz')
-    })
-	}
-})
-
-Deno.test({
-	name: '.match() should return nested partials of subrouters',
-	fn(): void {
-    var r1 = wayfarer()
-    var r2 = wayfarer()
-    var r3 = wayfarer()
-    r3.on('/:grandchild', () => {})
-    r2.on('/:child', r3)
-    r1.on('/foo/:parent', r2)
-    var matched = r1.match('/foo/bin/bar/baz')
-    assertEquals(matched.params.parent, 'bin')
-    assertEquals(matched.params.child, 'bar')
-    assertEquals(matched.params.grandchild, 'baz')
-	}
-})
-
-Deno.test({
-	name: '.match() returns a handler of a route',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/:user', function () {
-        assert(true, 'called')
-        resolve()
-      })
-      var toby = r.match('/tobi')
-      toby.cb()
-    })
-	}
-})
-
-Deno.test({
-	name: 'nested routes should call parent default route',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r1 = wayfarer('/404')
-      var r2 = wayfarer()
-      var r3 = wayfarer()
-
-      r2.on('/bar', r3)
-      r1.on('foo', r2)
-      r1.on('/404', pass)
-
-      r1('')
-      r1('foo')
-      r1('foo/bar')
-      r1('foo/beep/boop')
-
-      function pass (params) {
-        assert(true, 'called')
-        resolve()
-      }
-    })
-	}
-})
-
-Deno.test({
-	name: 'aliases',
-	fn(): void {
-    var r = wayfarer()
-    assertEquals(r, r.emit)
-  }
-})
-
-Deno.test({
-	name: 'wildcards',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r = wayfarer()
-
-      r.on('/bar/*', function (params) {
-        ++_catch
-        assertEquals(params.wildcard, 'foo/beep/boop')
-        if (_catch === 2) resolve()
-      })
-
-      r.on('/foo/:match/*', function (params) {
-        ++_catch
-        assertEquals(params.match, 'bar')
-        assertEquals(params.wildcard, 'beep/boop')
-        if (_catch === 2) resolve()
-      })
-
-      r('/bar/foo/beep/boop')
-      r('/foo/bar/beep/boop')
-    })
-	}
-})
-
-Deno.test({
-	name: 'wildcards dont conflict with params',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      let router = wayfarer()
-      router.on('/*', function (params) {
-        ++_catch
-        assert(false, 'wildcard called')
-        if (_catch === 6) resolve()
-      })
-      router.on('/:match', function (params) {
-        ++_catch
-        assert(true, 'param called')
-        if (_catch === 6) resolve()
-      })
-      router('/foo')
-
-      router = wayfarer()
-      router.on('/*', function (params) {
-        ++_catch
-        assert(false, 'wildcard called')
-        if (_catch === 6) resolve()
-      })
-      router.on('/:match/foo', function (params) {
-        ++_catch
-        assert(true, 'param called')
-        if (_catch === 6) resolve()
-      })
-      router('/foo/foo')
-
-      router = wayfarer()
-      router.on('/*', function (params) {
-        ++_catch
-        assert(true, 'wildcard called')
-        if (_catch === 6) resolve()
-      })
-      router.on('/:match/foo', function (params) {
-        ++_catch
-        assert(false, 'param called')
-        if (_catch === 6) resolve()
-      })
-      router('/foo/bar')
-    })
-	}
-})
-
-Deno.test({
-	name: 'safe decodeURIComponent',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r = wayfarer('/404')
-      r.on('/Deno.test/:id', function (params) {
-        ++_catch
-        assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
-      })
-      r.on('/404', function () {
-        ++_catch
-        assert(true, 'called')
-        if (_catch === 2) resolve()
-      })
-      r('/Deno.test/hel%"Flo')
-    })
-	}
-})
-
-Deno.test({
-	name: 'safe decodeURIComponent - nested route',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r = wayfarer('/404')
-      r.on('/Deno.test/hello/world/:id/blah', function (params) {
-        ++_catch
-        assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
-      })
-      r.on('/404', function () {
-        ++_catch
-        assert(true, 'called')
-        if (_catch === 2) resolve()
-      })
-      r('/Deno.test/hello/world/hel%"Flo/blah')
-    })
-  }
-})
-
-Deno.test({
-	name: 'safe decodeURIComponent - wildcard',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r = wayfarer('/404')
-      r.on('/Deno.test/*', function (params) {
-        ++_catch
-        assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
-      })
-      r.on('/404', function () {
-        ++_catch
-        assert(true, 'called')
-        if (_catch === 2) resolve()
-      })
-      r('/Deno.test/hel%"Flo')
-    })
-	}
-})
-
-Deno.test({
-	name: 'should expose .route property',
-	fn(): void {
-    var r = wayfarer()
-    r.on('/foo', function () {})
-    assertEquals(r.match('/foo').route, '/foo', 'exposes route property')
-	}
-})
-
-Deno.test({
-	name: 'should be called with self',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      var r = wayfarer()
-      r.on('/foo', function callback () {
-        assertEquals(this, callback, 'calling context is self')
-        resolve()
-      })
-      r('/foo')
-    })
-	}
-})
-
-Deno.test({
-	name: 'can register callback on many routes',
-	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
-      var r = wayfarer()
-      var routes = ['/foo', '/bar']
-      r.on('/foo', callback)
-      r.on('/bar', callback)
-      for (var i = 0, len = routes.length, matched; i < len; i++) {
-        matched = r.match(routes[i])
-        assertEquals(matched.cb, callback, 'matched callback is same')
-        assertEquals(matched.route, routes[i], 'matched route is same')
-        r(routes[i])
-      }
-      function callback () {
-        ++_catch
-        assertEquals(this, callback, 'calling context is same')
-        if (_catch === 2) resolve()
-      }
-    })
-	}
-})
-
-await Deno.runTests()

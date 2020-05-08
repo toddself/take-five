@@ -1,0 +1,27 @@
+{
+  "name": "take-five",
+  "version": "1.0.0",
+  "description": "[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Ftoddself%2Ftake-five%2Fbadge&style=flat-square)](https://actions-badge.atrox.dev/toddself/take-five/goto)",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^13.11.1",
+    "nanorequest": "^4.0.1",
+    "tap": "^14.10.7",
+    "typescript": "^3.8.3"
+  },
+  "scripts": {
+    "test": "tap *_test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toddself/take-five.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/toddself/take-five/issues"
+  },
+  "homepage": "https://github.com/toddself/take-five#readme"
+}
