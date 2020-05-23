@@ -1,19 +1,10 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "esModuleInterop": true,
-    "lib": ["esnext"],
-    "module": "esnext",
-    "moduleResolution": "node",
-    "noEmit": true,
-    "pretty": true,
-    "resolveJsonModule": true,
-    "target": "esnext",
-    "paths": {
-      "https://*": ["../../Library/Caches/deno/deps/https/*"]
-    }
-  },
-  "include": [
-    "./**/*.ts"
-  ]
+    "target": "ESNEXT",
+    "module": "commonjs",
+    "declaration": true,
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": false
+  }
 }

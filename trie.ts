@@ -1,25 +1,22 @@
 export type EmitterCallback = (...args: any[]) => void
+export const paramSym = Symbol('para')
+export const rootSym = Symbol('root')
 
-export interface Params {
-  [key: string]: string
-}
+export type Params = Map<string, string>
+export type NodeList = Map<string | typeof paramSym | typeof rootSym, TrieNode>
 
 export interface TrieNode {
   wildcard?: boolean
   name?: string
-  nodes?: TrieNode,
+  nodes?: NodeList
   cb?: EmitterCallback,
   route?: string,
-  params?: {
-    [key: string]: string
-  }
+  params?: Params
 }
-
-export const paramSym = Symbol('para')
 
 export interface TrieInterface {
   create: (route: string) => TrieNode
-  match: (route: string) => TrieNode
+  match: (route: string) => TrieNode | undefined
   mount: (route: string, node: TrieNode) => void
   trie: TrieNode
 }
@@ -29,7 +26,7 @@ export class Trie implements TrieInterface {
   private paramRE = /^:|^\*/
 
   constructor () {
-    this.trie = {nodes: {}}
+    this.trie = {nodes: new Map()}
   }
 
   create (route: string): TrieNode {
@@ -37,9 +34,9 @@ export class Trie implements TrieInterface {
     return this.createNode(routes, 0, this.trie)
   }
 
-  match (route: string): TrieNode {
+  match (route: string): TrieNode | undefined {
     const routes = this.splitRoutes(route)
-    const params = {}
+    const params: Map<string, string> = new Map()
     const node = this.search(routes, 0, this.trie, params)
     if (!node) return
     return Object.assign({params}, node)
@@ -56,8 +53,9 @@ export class Trie implements TrieInterface {
 
     // delegate properties from '/' to the new node
     // '/' cannot be reached once mounted
-    if (node.nodes['']) {
-      Object.keys(node.nodes['']).forEach((key: string) => {
+    if (node.nodes && node.nodes.has(rootSym)) {
+      const root = node.nodes.get(rootSym)
+      Object.keys(root).forEach((key: string) => {
         if (key === 'nodes') return
         node[key] = node.nodes[''][key]
       })

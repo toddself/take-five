@@ -1,7 +1,7 @@
 import { test } from 'tap'
 import { wayfarer } from './wayfarer'
 
-test('should match a path', (t): void => {
+test('should match a path', (t) => {
   var r = wayfarer()
   r.on('/', function () {
     t.ok(true, 'called')
@@ -10,7 +10,7 @@ test('should match a path', (t): void => {
   r('/')
 })
 
-test('should match a default path', (t): void => {
+test('should match a default path', (t) => {
   var r = wayfarer()
   r.on(void 0, function () {
     t.ok(true, 'called')
@@ -19,7 +19,7 @@ test('should match a default path', (t): void => {
   r('/')
 })
 
-test('should match a nested path', (t): void => {
+test('should match a nested path', (t) => {
   var r = wayfarer()
   r.on('/foo/bar', function () {
     t.ok(true, 'called')
@@ -28,7 +28,7 @@ test('should match a nested path', (t): void => {
   r('/foo/bar')
 })
 
-test('should match a default path', (t): void => {
+test('should match a default path', (t) => {
   var r = wayfarer('/404')
   r.on('/404', function () {
     t.ok(true, 'default')
@@ -37,7 +37,7 @@ test('should match a default path', (t): void => {
   r('/nope')
 })
 
-test('should allow passing of extra values', (t): void => {
+test('should allow passing of extra values', (t) => {
     var foo = {}
     var bar = {}
     var r = wayfarer()
@@ -49,7 +49,7 @@ test('should allow passing of extra values', (t): void => {
     r('/foo', foo, bar)
 })
 
-test('.emit() should match paths', (t): void => {
+test('.emit() should match paths', (t) => {
   t.plan(2)
   var r = wayfarer()
   r.on('/foo/bar', function (param) {
@@ -62,7 +62,7 @@ test('.emit() should match paths', (t): void => {
   r('/foo/baz')
 })
 
-test('.match() should match paths', (t): void => {
+test('.match() should match paths', (t) => {
   t.plan(2)
   var r = wayfarer()
   r.on('/foo/bar', function () {
@@ -78,7 +78,7 @@ test('.match() should match paths', (t): void => {
   t.deepEqual(baz.route, '/foo/baz', '/foo/baz route exists')
 })
 
-test('.emit() should match partials', (t): void => {
+test('.emit() should match partials', (t) => {
   var r = wayfarer()
   r.on('/:user', function (param) {
     t.deepEqual(param.user, 'tobi', 'param matched')
@@ -87,7 +87,7 @@ test('.emit() should match partials', (t): void => {
   r('/tobi')
 })
 
-test('.match() should match partials', (t): void => {
+test('.match() should match partials', (t) => {
   var r = wayfarer()
   r.on('/:user', () => {})
   var toby = r.match('/tobi')
@@ -95,7 +95,7 @@ test('.match() should match partials', (t): void => {
   t.end()
 })
 
-test('.emit() should match paths before partials', (t): void => {
+test('.emit() should match paths before partials', (t) => {
   var r = wayfarer()
   r.on('/foo', function () {
     t.ok(true, 'called')
@@ -105,7 +105,7 @@ test('.emit() should match paths before partials', (t): void => {
   r('/foo')
 })
 
-test('.emit() should allow path overriding', (t): void => {
+test('.emit() should allow path overriding', (t) => {
   var r = wayfarer()
   r.on('/:user', function () {
     t.fail('wrong callback called')
@@ -117,7 +117,7 @@ test('.emit() should allow path overriding', (t): void => {
   r('/foo')
 })
 
-test('.emit() should match nested partials', (t): void => {
+test('.emit() should match nested partials', (t) => {
   var r = wayfarer()
   r.on('/:user/:name', function (param) {
     t.deepEqual(param.user, 'tobi', 'param matched')
@@ -127,7 +127,7 @@ test('.emit() should match nested partials', (t): void => {
   r('/tobi/baz')
 })
 
-test('.emit() should parse encoded params', (t): void => {
+test('.emit() should parse encoded params', (t) => {
   var r = wayfarer()
   r.on('/:channel', function (param) {
     t.deepEqual(param.channel, '#choo', 'param matched')
@@ -136,7 +136,7 @@ test('.emit() should parse encoded params', (t): void => {
   r('/%23choo')
 })
 
-test('.emit() should throw if no matches are found', (t): void => {
+test('.emit() should throw if no matches are found', (t) => {
   var r1 = wayfarer()
   t.throws(() =>{
     r1('/woops')
@@ -144,7 +144,7 @@ test('.emit() should throw if no matches are found', (t): void => {
   t.end()
 })
 
-test('.emit() should return values', (t): void => {
+test('.emit() should return values', (t) => {
   var r1 = wayfarer()
   r1.on('/foo', function () {
     return 'hello'
@@ -153,7 +153,7 @@ test('.emit() should return values', (t): void => {
   t.end()
 })
 
-test('.emit() mount subrouters', (t): void => {
+test('.emit() mount subrouters', (t) => {
   t.plan(5)
   var r4 = wayfarer()
   var r3 = wayfarer()
@@ -191,7 +191,7 @@ test('.emit() mount subrouters', (t): void => {
   r7.emit('/foo/bin/bar')
 })
 
-test('.emit() should match nested partials of subrouters', (t): void => {
+test('.emit() should match nested partials of subrouters', (t) => {
   var r1 = wayfarer()
   var r2 = wayfarer()
   var r3 = wayfarer()
@@ -206,7 +206,7 @@ test('.emit() should match nested partials of subrouters', (t): void => {
   r1('/foo/bin/bar/baz')
 })
 
-test('.match() should return nested partials of subrouters', (t): void => {
+test('.match() should return nested partials of subrouters', (t) => {
   var r1 = wayfarer()
   var r2 = wayfarer()
   var r3 = wayfarer()
@@ -220,7 +220,7 @@ test('.match() should return nested partials of subrouters', (t): void => {
   t.end()
 })
 
-test('.match() returns a handler of a route', (t): void => {
+test('.match() returns a handler of a route', (t) => {
   var r = wayfarer()
   r.on('/:user', function () {
     t.ok(true, 'called')
@@ -230,7 +230,7 @@ test('.match() returns a handler of a route', (t): void => {
   toby.cb()
 })
 
-test('nested routes should call parent default route', (t): void => {
+test('nested routes should call parent default route', (t) => {
   t.plan(4)
   var r1 = wayfarer('/404')
   var r2 = wayfarer()
@@ -250,13 +250,13 @@ test('nested routes should call parent default route', (t): void => {
   }
 })
 
-test('aliases', (t): void => {
+test('aliases', (t) => {
   var r = wayfarer()
   t.deepEqual(r, r)
   t.end()
 })
 
-test('wildcards', (t): void => {
+test('wildcards', (t) => {
   t.plan(3)
   var r = wayfarer()
 
@@ -273,7 +273,7 @@ test('wildcards', (t): void => {
   r('/foo/bar/beep/boop')
 })
 
-test('wildcards dont conflict with params', (t): void => {
+test('wildcards dont conflict with params', (t) => {
   t.plan(3)
   let router = wayfarer()
   router.on('/*', function (params) {
@@ -303,7 +303,7 @@ test('wildcards dont conflict with params', (t): void => {
   router('/foo/bar')
 })
 
-test('safe decodeURIComponent', (t): void => {
+test('safe decodeURIComponent', (t) => {
   t.plan(1)
   var r = wayfarer('/404')
   r.on('/test/:id', function (params) {
@@ -315,7 +315,7 @@ test('safe decodeURIComponent', (t): void => {
   r('/test/hel%"Flo')
 })
 
-test('safe decodeURIComponent - nested route', (t): void => {
+test('safe decodeURIComponent - nested route', (t) => {
   t.plan(1)
   var r = wayfarer('/404')
   r.on('/test/hello/world/:id/blah', function (params) {
@@ -327,7 +327,7 @@ test('safe decodeURIComponent - nested route', (t): void => {
   r('/test/hello/world/hel%"Flo/blah')
 })
 
-test('safe decodeURIComponent - wildcard', (t): void => {
+test('safe decodeURIComponent - wildcard', (t) => {
   t.plan(1)
   var r = wayfarer('/404')
   r.on('/test/*', function (params) {
@@ -339,14 +339,14 @@ test('safe decodeURIComponent - wildcard', (t): void => {
   r('/test/hel%"Flo')
 })
 
-test('should expose .route property', (t): void => {
+test('should expose .route property', (t) => {
   var r = wayfarer()
   r.on('/foo', function () {})
   t.deepEqual(r.match('/foo').route, '/foo', 'exposes route property')
   t.end()
 })
 
-test('should be called with self', (t): void => {
+test('should be called with self', (t) => {
   var r = wayfarer()
   r.on('/foo', function callback () {
     t.deepEqual(this, callback, 'calling context is self')
@@ -355,7 +355,7 @@ test('should be called with self', (t): void => {
   r('/foo')
 })
 
-test('can register callback on many routes', (t): void => {
+test('can register callback on many routes', (t) => {
   t.plan(6)
   var r = wayfarer()
   var routes = ['/foo', '/bar']
