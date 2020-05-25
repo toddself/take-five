@@ -6,13 +6,18 @@
     "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
-    "plugins": [ { "name": "deno_ls_plugin" } ],
     "pretty": true,
     "resolveJsonModule": true,
     "target": "esnext",
+    "noImplicitThis": false,
     "paths": {
       "https://*": ["../../Library/Caches/deno/deps/https/*"]
-    }
+    },
+    "plugins": [{
+      "name": "typescript-deno-plugin",
+      "enable": true,
+      "importmap": "import_map.json"
+    }]
   },
   "include": [
     "./**/*.ts"

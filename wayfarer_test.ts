@@ -104,7 +104,7 @@ Deno.test({
 
       var baz = r.match('/foo/baz')
       assertEquals(baz.route, '/foo/baz', '/foo/baz route exists')
-      setTimeout(resolve, 1)
+      setTimeout(() => resolve(), 1)
     })
   }
 })
@@ -234,7 +234,8 @@ Deno.test({
       r2.on('/', function () {
         ++_catch
         assert(true, 'nested 1 level')
-        if (_catch === 4) resolve()
+        //if (_catch === 4) resolve()
+        resolve()
       })
       r1.on('/home', r2)
       r1('/home')
@@ -333,7 +334,7 @@ Deno.test({
       r1('foo/bar')
       r1('foo/beep/boop')
 
-      function pass (params) {
+      function pass () {
         assert(true, 'called')
         resolve()
       }
@@ -378,31 +379,29 @@ Deno.test({
 Deno.test({
 	name: 'wildcards dont conflict with params',
 	fn(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let _catch = 0
       let router = wayfarer()
       router.on('/*', function (params) {
-        ++_catch
         assert(false, 'wildcard called')
-        if (_catch === 6) resolve()
+        reject()
       })
       router.on('/:match', function (params) {
         ++_catch
         assert(true, 'param called')
-        if (_catch === 6) resolve()
+        if (_catch === 3) resolve()
       })
       router('/foo')
 
       router = wayfarer()
       router.on('/*', function (params) {
-        ++_catch
         assert(false, 'wildcard called')
-        if (_catch === 6) resolve()
+        reject()
       })
       router.on('/:match/foo', function (params) {
         ++_catch
         assert(true, 'param called')
-        if (_catch === 6) resolve()
+        if (_catch === 3) resolve()
       })
       router('/foo/foo')
 
@@ -410,12 +409,11 @@ Deno.test({
       router.on('/*', function (params) {
         ++_catch
         assert(true, 'wildcard called')
-        if (_catch === 6) resolve()
+        if (_catch === 3) resolve()
       })
       router.on('/:match/foo', function (params) {
-        ++_catch
         assert(false, 'param called')
-        if (_catch === 6) resolve()
+        reject()
       })
       router('/foo/bar')
     })
@@ -425,20 +423,17 @@ Deno.test({
 Deno.test({
 	name: 'safe decodeURIComponent',
 	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
+    return new Promise((resolve, reject) => {
       var r = wayfarer('/404')
-      r.on('/Deno.test/:id', function (params) {
-        ++_catch
+      r.on('/test/:id', function (params) {
         assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
+        reject()
       })
       r.on('/404', function () {
-        ++_catch
         assert(true, 'called')
-        if (_catch === 2) resolve()
+        resolve()
       })
-      r('/Deno.test/hel%"Flo')
+      r('/test/hel%"Flo')
     })
 	}
 })
@@ -446,18 +441,15 @@ Deno.test({
 Deno.test({
 	name: 'safe decodeURIComponent - nested route',
 	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
+    return new Promise((resolve, reject) => {
       var r = wayfarer('/404')
       r.on('/Deno.test/hello/world/:id/blah', function (params) {
-        ++_catch
         assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
+        reject()
       })
       r.on('/404', function () {
-        ++_catch
         assert(true, 'called')
-        if (_catch === 2) resolve()
+        resolve()
       })
       r('/Deno.test/hello/world/hel%"Flo/blah')
     })
@@ -467,18 +459,15 @@ Deno.test({
 Deno.test({
 	name: 'safe decodeURIComponent - wildcard',
 	fn(): Promise<void> {
-    return new Promise((resolve) => {
-      let _catch = 0
+    return new Promise((resolve, reject) => {
       var r = wayfarer('/404')
       r.on('/Deno.test/*', function (params) {
-        ++_catch
         assert(false, 'we should not be here')
-        if (_catch === 2) resolve()
+        reject()
       })
       r.on('/404', function () {
-        ++_catch
         assert(true, 'called')
-        if (_catch === 2) resolve()
+        resolve()
       })
       r('/Deno.test/hel%"Flo')
     })
@@ -499,7 +488,7 @@ Deno.test({
 	fn(): Promise<void> {
     return new Promise((resolve) => {
       var r = wayfarer()
-      r.on('/foo', function callback () {
+      r.on('/foo', function callback (this: typeof callback) {
         assertEquals(this, callback, 'calling context is self')
         resolve()
       })
@@ -523,7 +512,7 @@ Deno.test({
         assertEquals(matched.route, routes[i], 'matched route is same')
         r(routes[i])
       }
-      function callback () {
+      function callback (this: typeof callback) {
         ++_catch
         assertEquals(this, callback, 'calling context is same')
         if (_catch === 2) resolve()
@@ -531,5 +520,3 @@ Deno.test({
     })
 	}
 })
-
-await Deno.runTests()

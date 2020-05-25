@@ -1,4 +1,5 @@
-import {HTTPSOptions, Server, ServerRequest, Response, STATUS_TEXT, serve, serveTLS} from 'http://deno.land/std/http/server.ts'
+import {HTTPSOptions, Server, ServerRequest, Response, serve, serveTLS} from 'https://deno.land/std/http/server.ts'
+import {STATUS_TEXT} from 'https://deno.land/std/http/http_status.ts'
 import {wayfarer, Emitter} from './wayfarer.ts'
 
 export {Response, ServerRequest}
@@ -81,9 +82,9 @@ export class TakeFive {
   allowOrigin: string
   allowCredentials: boolean
   routers: Map<string, Emitter>
-  server: Server
+  server: Server = {} as Server
   methods: string[]
-  handleError: ErrorHandler
+  handleError: ErrorHandler = () => {}
 
   private _allowMethods: string[] = ['options'].concat(methods)
   private _allowHeaders: string[] = HEADERS.slice(0)
@@ -96,7 +97,7 @@ export class TakeFive {
   }
   private _httpOpts: HTTPOptions
   private _ctx: TakeFiveContext
-  private _urlBase: string
+  private _urlBase: string = ''
 
   constructor (opts: TakeFiveOpts = {}) {
     this.maxPost = opts.maxPost || MAX_POST
@@ -203,8 +204,10 @@ export class TakeFive {
       const isUint8 = Object.prototype.toString.call(content) === '[object Uint8Array]'
 
       if (typeof content !== 'string' && !isUint8) {
+        if (!res.headers) throw new Error('Headers missing from response')
         if (res.headers.has('Content-Type')) {
-          const parser = this.parsers[res.headers.get('Content-Type')]
+          const type = res.headers.get('Content-Type') || ''
+          const parser = this.parsers[type]
           content = parser.toString(content, req.url)
         } else {
           res.headers.append('Content-Type', 'application/json')
@@ -213,7 +216,7 @@ export class TakeFive {
       }
 
       res.status = code
-      res.body = isUint8 ? content : new TextEncoder().encode(content) 
+      res.body = isUint8 ? content : new TextEncoder().encode(content)
       return req.respond(res)
     }
 
@@ -230,6 +233,7 @@ export class TakeFive {
 
       const message = JSON.stringify({message: content})
       res.status = code
+      if (!res.headers) throw new Error('Response object missing headers')
       res.headers.append('Content-Type', 'application/json')
       res.body = new TextEncoder().encode(message)
       return req.respond(res)
@@ -249,10 +253,12 @@ export class TakeFive {
   }
 
   cors (res: Response) {
-    res.headers.append('Access-Control-Allow-Origin', this.allowOrigin)
-    res.headers.append('Access-Control-Allow-Headers', this._allowHeaders.join(','))
-    res.headers.append('Access-Control-Allow-Credentials', String(this.allowCredentials))
-    res.headers.append('Access-Control-Allow-Methods', this._allowMethods.join(',').toUpperCase())
+    if (res.headers) {
+      res.headers.append('Access-Control-Allow-Origin', this.allowOrigin)
+      res.headers.append('Access-Control-Allow-Headers', this._allowHeaders.join(','))
+      res.headers.append('Access-Control-Allow-Credentials', String(this.allowCredentials))
+      res.headers.append('Access-Control-Allow-Methods', this._allowMethods.join(',').toUpperCase())
+    }
   }
 
   close () {
@@ -260,10 +266,10 @@ export class TakeFive {
   }
 
   async _verifyBody (req: ServerRequest, res: Response, ctx: TakeFiveContext): Promise<void> {
-    const type = req.headers.get('Content-Type')
-    const size = req.contentLength
+    const type = req.headers && req.headers.get('Content-Type') || ''
+    const size = req.contentLength || Infinity
     const _ctxMax = parseInt(String(ctx.maxPost), 10)
-    const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax 
+    const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax
 
     let allowContentTypes = this._allowContentTypes.slice(0)
     if (ctx.allowContentTypes) {
@@ -277,14 +283,14 @@ export class TakeFive {
     if (!allowContentTypes.includes(type)) {
       return ctx.err(415, `Expected data to be of ${allowContentTypes.join(', ')} not ${type}`)
     } else {
-      const buf = new Uint8Array(req.contentLength);
+      const buf = new Uint8Array(size);
       let bufSlice = buf;
       let totRead = 0;
       while (true) {
         const nread = await req.body.read(bufSlice)
-        if (nread === Deno.EOF) break
+        if (nread === null) break
         totRead += nread
-        if (totRead >= req.contentLength) break
+        if (totRead >= size) break
         bufSlice = bufSlice.subarray(nread)
       }
       try {
@@ -313,7 +319,7 @@ export class TakeFive {
       const method = req.method.toLowerCase()
       const url = req.url.split('?')[0]
       const router = this.routers.get(method)
-      router(url, req, res, ctx)
+      if (router) router(url, req, res, ctx)
     } catch (err) {
       if (ctx.finished) {
         throw err
@@ -344,7 +350,7 @@ export class TakeFive {
         router.on(matcher, (params: {[key: string]: any}, req: ServerRequest, res: Response, ctx: TakeFiveContext): void => {
           const routeHandlers = handlers.slice(0)
 
-          const conlen = parseInt(req.headers.get('Content-Length'), 10) || 0
+          const conlen = parseInt(req.headers.get('Content-Length') || '', 10) || 0
           if (conlen !== 0 && dataMethods.includes(req.method.toLowerCase())) {
             if (ctxOpts) ctx = Object.assign({}, ctx, ctxOpts)
             routeHandlers.unshift(this._verifyBody.bind(this))
@@ -369,7 +375,7 @@ export class TakeFive {
         p.then(() => {
           if (!ctx.finished && handlers.length > 0) {
             const next = handlers.shift()
-            iterate(next)
+            if (next) iterate(next)
           }
         })
           .catch((err) => {
@@ -379,6 +385,6 @@ export class TakeFive {
     }
 
     const next = handlers.shift()
-    iterate(next)
+    if (next) iterate(next)
   }
 }
