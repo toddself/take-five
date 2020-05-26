@@ -14,7 +14,7 @@
   },
   "scripts": {
     "test": "tap *_test.ts",
-    "build": "tsc --project tsconfig.json"
+    "build": "tsc --project ."
   },
   "repository": {
     "type": "git",

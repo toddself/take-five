@@ -61,8 +61,8 @@ export interface TakeFiveContext {
   [key: string]: any
 }
 
-export type ErrorHandler = (err: Error, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) => void
-export type RouteHandler = (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) => Promise<void>
+export type ErrorHandler = (err: Error, req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext) => void
+export type RouteHandler = (req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext) => Promise<void>
 
 type MatcherFunction = (
   route: string,
@@ -70,8 +70,8 @@ type MatcherFunction = (
   ctxOpts?: {[key: string]: any}
 ) => void
 
-function getHeader (r: http.ServerResponse | http.ClientRequest, headerName: string): string {
-  const header = r.getHeader(headerName)
+function getHeader (r: http.IncomingMessage, headerName: string): string {
+  const header = r.headers && r.headers[headerName]
   return String(Array.isArray(header) ? header[0] : header)
 }
 
@@ -146,7 +146,11 @@ export class TakeFive {
       this.server = http.createServer()
     }
 
-    this.server.on('request', (req, res) => this._onRequest(req, res))
+    this.server.on('request', (req, res) => {
+      console.log('REQUEST')
+      this._onRequest(req, res)
+    })
+    this.server.on('error', (err) => console.log(err))
     this.server.listen(this._httpOpts.port, addr)
   }
 
@@ -201,7 +205,7 @@ export class TakeFive {
     return data
   }
 
-  makeCtx (req: http.ClientRequest, res: http.ServerResponse) {
+  makeCtx (req: http.IncomingMessage, res: http.ServerResponse) {
     const send = (code: any, content?: any) => {
       return new Promise((resolve) => {
         if (typeof content === 'undefined') {
@@ -214,15 +218,15 @@ export class TakeFive {
           if (res.hasHeader('Content-Type')) {
             const type = getHeader(res, 'Content-Type')
             const parser = this.parsers[type]
-            content = parser.toString(content, req.path)
+            content = parser.toString(content, (req.url || ''))
           } else {
             res.setHeader('Content-Type', 'application/json')
-            content = this.parsers['application/json'].toString(content, req.path)
+            content = this.parsers['application/json'].toString(content, (req.url || ''))
           }
         }
 
         res.statusCode = code
-        return req.end(content, 'utf8', resolve)
+        return res.end(content, 'utf8', resolve)
       })
     }
 
@@ -247,7 +251,7 @@ export class TakeFive {
     return Object.assign({}, this.ctx, {send, err, finished: false})
   }
 
-  _handleError (err: Error, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) {
+  _handleError (err: Error, req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext) {
     if (typeof this.handleError === 'function') {
       this.handleError(err, req, res, ctx)
     }
@@ -268,7 +272,7 @@ export class TakeFive {
     return this.server.close()
   }
 
-  _verifyBody (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext): Promise<void> {
+  _verifyBody (req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext): Promise<void> {
     return new Promise((resolve, reject) => {
       const type = getHeader(res, 'content-type')
       const size = parseInt(getHeader(req, 'content-length') || '0', 10) || 0
@@ -302,29 +306,31 @@ export class TakeFive {
         req.on('error', reject)
         req.on('end', () => {
           const reqData = Buffer.from(data.concat())
-          ctx.body = this.parseBody(reqData, type, req.path)
+          ctx.body = this.parseBody(reqData, type, (req.url || ''))
           resolve()
         })
       }
     })
   }
 
-  _onRequest (req: http.ClientRequest, res: http.ServerResponse) {
+  _onRequest (req: http.IncomingMessage, res: http.ServerResponse) {
     this.cors(res)
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204
-      return req.end()
+      return res.end()
     }
 
     const ctx = this.makeCtx(req, res)
 
     try {
-      const method = req.method.toLowerCase()
-      const url = req.path.split('?')[0]
+      console.log(req)
+      const method = (req.method || '').toLowerCase()
+      const url = (req.url || '').split('?')[0]
       const router = this.routers.get(method)
       if (router) router(url, req, res, ctx)
     } catch (err) {
+      console.log(err)
       if (ctx.finished) {
         throw err
       }
@@ -351,16 +357,17 @@ export class TakeFive {
           throw new Error('handlers must be functions')
         }
 
-        router.on(matcher, (params: {[key: string]: any}, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext): void => {
+        router.on(matcher, (params: {[key: string]: any}, req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext): void => {
           const routeHandlers = handlers.slice(0)
 
           const conlen = parseInt(getHeader(req, 'Content-Length'), 10) || 0
-          if (conlen !== 0 && dataMethods.includes(req.method.toLowerCase())) {
+          const method = req.method || ''
+          if (conlen !== 0 && dataMethods.includes(method.toLowerCase())) {
             if (ctxOpts) ctx = Object.assign({}, ctx, ctxOpts)
             routeHandlers.unshift(this._verifyBody.bind(this))
           }
 
-          ctx.query = Object.fromEntries((new URL(req.path, this._urlBase)).searchParams)
+          ctx.query = Object.fromEntries((new URL(req.url || '', this._urlBase)).searchParams)
           ctx.params = params
           this._resolveHandlers(req, res, ctx, routeHandlers)
         })
@@ -372,7 +379,7 @@ export class TakeFive {
     })
   }
 
-  _resolveHandlers (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext, handlers: RouteHandler[]) {
+  _resolveHandlers (req: http.IncomingMessage, res: http.ServerResponse, ctx: TakeFiveContext, handlers: RouteHandler[]) {
     const iterate = async (handler: RouteHandler) => {
       try {
         await handler(req, res, ctx)
