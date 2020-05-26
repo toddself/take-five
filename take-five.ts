@@ -1,3 +1,6 @@
+// Copyright 2016-2020 the take-five authors. All rights reserved
+// Apache 2.0 license
+
 import {HTTPSOptions, Server, ServerRequest, Response, serve, serveTLS} from 'https://deno.land/std/http/server.ts'
 import {writeResponse} from 'https://deno.land/std/http/_io.ts'
 import {STATUS_TEXT} from 'https://deno.land/std/http/http_status.ts'

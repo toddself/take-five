@@ -1,3 +1,6 @@
+// Copyright 2016-2020 the take-five authors. All rights reserved
+// Apache 2.0 license
+
 import {
   assert,
   assertEquals,

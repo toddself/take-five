@@ -1,3 +1,6 @@
+// Copyright 2016-2020 the take-five authors. All rights reserved
+// Apache 2.0 license
+
 export type EmitterCallback = (...args: any[]) => void
 export const paramSym = Symbol()
 export const wildcardSym = Symbol()
