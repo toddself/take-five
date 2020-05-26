@@ -38,6 +38,8 @@ create_release () {
   fi
 }
 
+create_release
+
 make_path $PROJECT
 make_path $PROJECT/latest
 make_path $PROJECT/$VERSION
@@ -50,4 +52,3 @@ do
 done
 
 render_markdown
-create_release
