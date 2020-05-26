@@ -9,7 +9,9 @@ jobs:
 
     steps:
       - name: Setup Deno environment
-        uses: denolib/setup-deno@v1.2.0
+        uses: denolib/setup-deno@master
+        with:
+          deno-version: v1.x
       - name: Checkout
         uses: actions/checkout@v2.0.0
       - name: Run tests
