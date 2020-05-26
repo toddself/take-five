@@ -4,3 +4,4 @@ deps
 index.html
 release.json
 output.json
+node_modules

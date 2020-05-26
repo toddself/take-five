@@ -1,4 +1,5 @@
 import {HTTPSOptions, Server, ServerRequest, Response, serve, serveTLS} from 'https://deno.land/std/http/server.ts'
+import {writeResponse} from 'https://deno.land/std/http/_io.ts'
 import {STATUS_TEXT} from 'https://deno.land/std/http/http_status.ts'
 import {wayfarer, Emitter} from './wayfarer.ts'
 
@@ -236,7 +237,7 @@ export class TakeFive {
       if (!res.headers) throw new Error('Response object missing headers')
       res.headers.append('Content-Type', 'application/json')
       res.body = new TextEncoder().encode(message)
-      return req.respond(res)
+      await req.respond(res)
     }
 
     return Object.assign({}, this.ctx, {send, err, finished: false})
@@ -265,9 +266,23 @@ export class TakeFive {
     return this.server.close()
   }
 
+  private async drain (body: Deno.Reader, size: number): Promise<Uint8Array> {
+    const buf = new Uint8Array(size)
+    let bufSlice = buf
+    let totRead = 0
+    while (true) {
+      const c = await body.read(bufSlice)
+      if (c == null) break
+      totRead += c
+      if (totRead >= size) break
+      bufSlice = bufSlice.subarray(c)
+    }
+    return bufSlice
+  }
+
   async _verifyBody (req: ServerRequest, res: Response, ctx: TakeFiveContext): Promise<void> {
     const type = req.headers && req.headers.get('Content-Type') || ''
-    const size = req.contentLength || Infinity
+    const size = req.contentLength || 0
     const _ctxMax = parseInt(String(ctx.maxPost), 10)
     const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax
 
@@ -276,25 +291,24 @@ export class TakeFive {
       allowContentTypes = allowContentTypes.concat(ctx.allowContentTypes)
     }
 
+    // Shut down the sender without consuming the body. I wish there was a
+    // better way to handle this though
     if (size > maxPost) {
-      return ctx.err(413, 'Payload size exceeds maximum size for requests')
+      ctx.finished = true
+      res.status = 413
+      res.body = new TextEncoder().encode(STATUS_TEXT.get(413))
+      await writeResponse(req.w, res)
+      req.conn.close()
+      return
     }
 
     if (!allowContentTypes.includes(type)) {
+      await this.drain(req.body, size)
       return ctx.err(415, `Expected data to be of ${allowContentTypes.join(', ')} not ${type}`)
     } else {
-      const buf = new Uint8Array(size);
-      let bufSlice = buf;
-      let totRead = 0;
-      while (true) {
-        const nread = await req.body.read(bufSlice)
-        if (nread === null) break
-        totRead += nread
-        if (totRead >= size) break
-        bufSlice = bufSlice.subarray(nread)
-      }
+      const body = await this.drain(req.body, size)
       try {
-        ctx.body = this.parseBody(new TextDecoder('utf8').decode(bufSlice), type, req.url)
+        ctx.body = this.parseBody(new TextDecoder('utf8').decode(body), type, req.url)
       } catch (err) {
         ctx.finished = true
         ctx.err(400, `Payload is not valid ${type}`)
@@ -369,18 +383,15 @@ export class TakeFive {
   }
 
   _resolveHandlers (req: ServerRequest, res: Response, ctx: TakeFiveContext, handlers: RouteHandler[]) {
-    const iterate = (handler: RouteHandler) => {
-      const p = handler(req, res, ctx)
-      if (p && typeof p.then === 'function') {
-        p.then(() => {
-          if (!ctx.finished && handlers.length > 0) {
-            const next = handlers.shift()
-            if (next) iterate(next)
-          }
-        })
-          .catch((err) => {
-            this._handleError(err, req, res, ctx)
-          })
+    const iterate = async (handler: RouteHandler) => {
+      try {
+        await handler(req, res, ctx)
+        if (!ctx.finished && handlers.length > 0) {
+          const next = handlers.shift()
+          if (next) iterate(next)
+        }
+      } catch (err) {
+        this._handleError(err, req, res, ctx)
       }
     }
 

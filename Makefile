@@ -20,10 +20,10 @@ clean:
 		rm -f mod.ts release.json output.json index.html
 
 test:
-		$(foreach var,$(TEST_FILES),deno --allow-net $(var);)
+		deno test --allow-net
 
-fetch:
-		$(foreach var,$(SOURCE_FILES),deno fetch $(var);)
+cache:
+		deno cache take-five.ts
 
 release: $(APP_FILES)
 		./release.sh $^

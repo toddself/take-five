@@ -15,8 +15,8 @@ function JSONtoForm (data: {[key: string]: string}): string {
 }
 
 function request (
-  opts: {url: string} & __domTypes.RequestInit,
-  cb: (err: Error, res?: {statusCode: number, [key: string]: any}, body?: any) => void
+  opts: {url: string} & RequestInit,
+  cb: (err: Error | null, res?: {statusCode: number, [key: string]: any}, body?: any) => void
 ) {
   const url = opts.url
   delete opts.url
@@ -42,6 +42,7 @@ function request (
           })
       }
     })
+    .catch((err) => cb(err))
 }
 
 function setup (): TakeFive {
@@ -56,8 +57,8 @@ function setup (): TakeFive {
   takeFive.get('/', (req, res, ctx) => ctx.send({hello: ['world']}))
   takeFive.post('/', (req, res, ctx) => ctx.send(201, ctx.body))
   takeFive.post('/foobar', (req, res, ctx) => ctx.send(201, ctx.body))
-  takeFive.put('/:Deno.test', (req, res, ctx) => ctx.send(ctx.params))
-  takeFive.delete('/:Deno.test', (req, res, ctx) => ctx.send(ctx.query))
+  takeFive.put('/:test', (req, res, ctx) => ctx.send(ctx.params))
+  takeFive.delete('/:test', (req, res, ctx) => ctx.send(ctx.query))
   takeFive.get('/err', (req, res, ctx) => ctx.err('broken'))
   takeFive.get('/err2', (req, res, ctx) => ctx.err(400, 'bad'))
   takeFive.get('/err3', (req, res, ctx) => ctx.err(418))
@@ -68,7 +69,8 @@ function setup (): TakeFive {
   takeFive.get('/next', [
     async (req, res, ctx) => {
       res.status = 202
-      res.headers.set('Content-Type', 'application/json')
+      if (res.headers) res.headers.set('Content-Type', 'application/json')
+
     },
     (req, res, ctx) => {
       res.body = new TextEncoder().encode('{"message": "complete"}')
@@ -103,13 +105,16 @@ Deno.test({
 Deno.test({
 	name: 'does not call end twice',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/end'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 418, 'teapot')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 418, 'teapot')
+          resolve()
+        }
       })
     })
   }
@@ -118,15 +123,18 @@ Deno.test({
 Deno.test({
 	name: 'not found',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/bar/doo'
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 404, 'not found')
-        assertEquals(body.message, 'Not found', 'not found')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 404, 'not found')
+          assertEquals(body.message, 'Not found', 'not found')
+          resolve()
+        }
       })
     })
 	}
@@ -135,15 +143,18 @@ Deno.test({
 Deno.test({
 	name: 'get json',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/'
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 200, 'got a 200')
-        assertEquals(body, {hello: ['world']}, 'hello, world')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 200, 'got a 200')
+          assertEquals(body, {hello: ['world']}, 'hello, world')
+          resolve()
+        }
       })
     })
 	}
@@ -152,15 +163,18 @@ Deno.test({
 Deno.test({
 	name: '500 error',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/err'
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 500, 'default is 500')
-        assertEquals(body.message, 'broken', 'it is!')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 500, 'default is 500')
+          assertEquals(body.message, 'broken', 'it is!')
+          resolve()
+        }
       })
     })
 	}
@@ -169,14 +183,17 @@ Deno.test({
 Deno.test({
 	name: '400 error',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/err2'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 400, 'bad content')
-        assertEquals(body.message, 'bad', 'bad dudes')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 400, 'bad content')
+          assertEquals(body.message, 'bad', 'bad dudes')
+          resolve()
+        }
       })
     })
 	}
@@ -185,14 +202,17 @@ Deno.test({
 Deno.test({
 	name: '418 error',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/err3'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 418, 'teapot')
-        assert(/teapot/i.Deno.test(body.message), 'short and stout')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 418, 'teapot')
+          assert(/teapot/i.test(body.message), 'short and stout')
+          resolve()
+        }
       })
     })
 	}
@@ -201,14 +221,17 @@ Deno.test({
 Deno.test({
 	name: 'custom error handler not installed',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/err4'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 500, 'internal')
-        assertEquals(body.message, 'Internal server error')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 500, 'internal')
+          assertEquals(body.message, 'Internal server error')
+          resolve()
+        }
       })
     })
 	}
@@ -217,7 +240,7 @@ Deno.test({
 Deno.test({
 	name: 'post json',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/',
         method: 'POST',
@@ -227,9 +250,12 @@ Deno.test({
         }
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 201, 'got a 201')
-        assertEquals(body, {foo: 'bar'}, 'matches')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 201, 'got a 201')
+          assertEquals(body, {foo: 'bar'}, 'matches')
+          resolve()
+        }
       })
     })
 	}
@@ -238,16 +264,19 @@ Deno.test({
 Deno.test({
 	name: 'post not-json',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/',
         method: 'POST',
         body: 'foo=bar'
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 415, 'content not allowed')
-        assertEquals(body.message, 'Expected data to be of application/json, foo/bar not text/plain;charset=UTF-8', 'no match')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 415, 'content not allowed')
+          assertEquals(body.message, 'Expected data to be of application/json, foo/bar not text/plain;charset=UTF-8', 'no match')
+          resolve()
+        }
       })
     })
 	}
@@ -256,7 +285,7 @@ Deno.test({
 Deno.test({
 	name: 'post global custom content type',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/urlencoded',
         method: 'POST',
@@ -267,9 +296,12 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 201, 'got a 201')
-        assertEquals(body, '"foo=bar"', 'matches')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 201, 'got a 201')
+          assertEquals(body, '"foo=bar"', 'matches')
+          resolve()
+        }
       })
     })
 	}
@@ -278,7 +310,7 @@ Deno.test({
 Deno.test({
 	name: 'post non-json with custom parser',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/urlencoded',
         method: 'post',
@@ -289,9 +321,12 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 201, 'got a 201')
-        assertEquals(body, {foo: 'bar'}, 'matches')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 201, 'got a 201')
+          assertEquals(body, {foo: 'bar'}, 'matches')
+          resolve()
+        }
       })
     })
 	}
@@ -300,7 +335,7 @@ Deno.test({
 Deno.test({
 	name: 'post too large with header',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         method: 'POST',
         url: 'http://localhost:3000/',
@@ -310,10 +345,20 @@ Deno.test({
           'Content-Type': 'application/json'
         }
       }
+
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 413, 'too large')
-        assertEquals(body.message, `Payload size exceeds maximum size for requests`, 'too large')
-        resolve()
+        // sometimes the server closes the connection before the reply is
+        // sent even though it's being awaited -- tbf this is ok since
+        // the client is being a jerk
+        if (err) {
+          assertEquals(err.message, 'error sending request for url (http://localhost:3000/): error writing a body to connection: Broken pipe (os error 32)')
+          return resolve()
+        }
+        if (res) {
+          assertEquals(res.statusCode, 413, 'too big')
+          assertEquals(body, 'Request Entity Too Large')
+          return resolve()
+        }
       })
     })
 	}
@@ -322,20 +367,29 @@ Deno.test({
 Deno.test({
 	name: 'post too large with header and custom size per route',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         method: 'POST',
         url: 'http://localhost:3000/zero',
-        body: '',
+        body: 'i',
         headers: {
           'Content-Length': '1',
           'Content-Type': 'application/json'
         }
       }
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 413, 'too large')
-        assertEquals(body.message, `Payload size exceeds maximum size for requests`, 'too large')
-        resolve()
+        // sometimes the server closes the connection before the reply is
+        // sent even though it's being awaited -- tbf this is ok since
+        // the client is being a jerk
+        if (err) {
+          assertEquals(err.message, 'error sending request for url (http://localhost:3000/): error writing a body to connection: Broken pipe (os error 32)')
+          return resolve()
+        }
+        if (res) {
+          assertEquals(res.statusCode, 413, 'too big')
+          assertEquals(body, 'Request Entity Too Large')
+          return resolve()
+        }
       })
     })
 	}
@@ -344,7 +398,7 @@ Deno.test({
 Deno.test({
 	name: 'put no content',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         url: 'http://localhost:3000/',
         method: 'PUT',
@@ -355,9 +409,12 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 200, '200')
-        assertEquals(body, {Deno.test: ""}, 'get back cheeky params')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 200, '200')
+          assertEquals(body, {test: ""}, 'get back cheeky params')
+          resolve()
+        }
       })
     })
 	}
@@ -366,7 +423,7 @@ Deno.test({
 Deno.test({
 	name: 'put with url params',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         method: 'PUT',
         url: 'http://localhost:3000/foobar',
@@ -375,8 +432,11 @@ Deno.test({
         }
       }
       request(opts, (err, res, body) => {
-        assertEquals(body, {Deno.test: 'foobar'}, 'params passed')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(body, {test: 'foobar'}, 'params passed')
+          resolve()
+        }
       })
     })
   }
@@ -385,15 +445,18 @@ Deno.test({
 Deno.test({
 	name: 'delete with query params',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const opts = {
         method: 'DELETE',
         url: 'http://localhost:3000/foobar?beep=boop'
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(body, {beep: 'boop'}, 'url parsed')
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(body, {beep: 'boop'}, 'url parsed')
+          resolve()
+        }
       })
     })
 	}
@@ -414,16 +477,22 @@ Deno.test({
 
 Deno.test({
   name: 'teardown',
+  sanitizeOps: false,
+  sanitizeResources: false,
   fn: (): Promise<void> => {
-    tf.close()
-    return Promise.resolve()
+    return new Promise((resolve) => {
+      tf.close()
+      setTimeout(() => {
+        resolve()
+      }, 1)
+    })
   }
 })
 
 Deno.test({
 	name: 'full run',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let _latch = 0
       const opts = {
         allowMethods: ['PROPFIND'],
@@ -444,15 +513,18 @@ Deno.test({
         method: 'OPTIONS'
       }
       request(opts1, (err, res, body) => {
-        ++_latch
-        assertEquals(res.statusCode, 204, 'no content')
-        assertEquals(res.headers['access-control-allow-origin'], 'localhost', 'acao')
-        assertEquals(res.headers['access-control-allow-credentials'], 'false', 'acac')
-        assertEquals(res.headers['access-control-allow-headers'], 'Content-Type,Accept,X-Requested-With,X-Foo', 'acah')
-        assertEquals(res.headers['access-control-allow-methods'], 'OPTIONS,GET,PUT,POST,DELETE,PATCH,PROPFIND', 'acam')
-        if (_latch === 2) {
-          server.close()
-          resolve()
+        if (err) return reject(err)
+        if (res) {
+          ++_latch
+          assertEquals(res.statusCode, 204, 'no content')
+          assertEquals(res.headers['access-control-allow-origin'], 'localhost', 'acao')
+          assertEquals(res.headers['access-control-allow-credentials'], 'false', 'acac')
+          assertEquals(res.headers['access-control-allow-headers'], 'Content-Type,Accept,X-Requested-With,X-Foo', 'acah')
+          assertEquals(res.headers['access-control-allow-methods'], 'OPTIONS,GET,PUT,POST,DELETE,PATCH,PROPFIND', 'acam')
+          if (_latch === 2) {
+            server.close()
+            resolve()
+          }
         }
       })
 
@@ -460,15 +532,18 @@ Deno.test({
         url: 'http://localhost:3000'
       }
       request(opts2, (err, res, body) => {
-        ++_latch
-        assertEquals(res.statusCode, 200, 'no content')
-        assertEquals(res.headers['access-control-allow-origin'], 'localhost', 'acao')
-        assertEquals(res.headers['access-control-allow-credentials'], 'false', 'acac')
-        assertEquals(res.headers['access-control-allow-headers'], 'Content-Type,Accept,X-Requested-With,X-Foo', 'acah')
-        assertEquals(res.headers['access-control-allow-methods'], 'OPTIONS,GET,PUT,POST,DELETE,PATCH,PROPFIND', 'acam')
-        if (_latch === 2) {
-          server.close()
-          resolve()
+        if (err) return reject(err)
+        if (res) {
+          ++_latch
+          assertEquals(res.statusCode, 200, 'no content')
+          assertEquals(res.headers['access-control-allow-origin'], 'localhost', 'acao')
+          assertEquals(res.headers['access-control-allow-credentials'], 'false', 'acac')
+          assertEquals(res.headers['access-control-allow-headers'], 'Content-Type,Accept,X-Requested-With,X-Foo', 'acah')
+          assertEquals(res.headers['access-control-allow-methods'], 'OPTIONS,GET,PUT,POST,DELETE,PATCH,PROPFIND', 'acam')
+          if (_latch === 2) {
+            server.close()
+            resolve()
+          }
         }
       })
     })
@@ -478,7 +553,7 @@ Deno.test({
 Deno.test({
   name: 'body parser',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const serverOpts = {
         maxPost: 100
       }
@@ -496,10 +571,13 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 400, 'invalid json')
-        assertEquals(body.message, 'Payload is not valid application/json', 'not valid')
-        server.close()
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 400, 'invalid json')
+          assertEquals(body.message, 'Payload is not valid application/json', 'not valid')
+          server.close()
+          resolve()
+        }
       })
     })
 	}
@@ -508,7 +586,7 @@ Deno.test({
 Deno.test({
   name: 'changing ctx',
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const five = new TakeFive()
 
       const ctx = {
@@ -531,8 +609,11 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        five.close()
-        resolve()
+        if (err) return reject(err)
+        if (res) {
+          five.close()
+          resolve()
+        }
       })
     })
   }
@@ -540,13 +621,15 @@ Deno.test({
 
 Deno.test({
   name: 'custom error handler',
+  sanitizeOps: false,
+  sanitizeResources: false,
 	fn: (): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const five = new TakeFive()
       five.listen(3000)
       five.handleError = (err, req, res, ctx) => {
-        ctx.err(501, 'Not Implemented')
         ctx.finished = true
+        ctx.err(501, 'Not Implemented')
       }
 
 
@@ -561,12 +644,14 @@ Deno.test({
       }
 
       request(opts, (err, res, body) => {
-        assertEquals(res.statusCode, 501, 'not implemented')
-        assertEquals(body.message, 'Not Implemented')
+        if (err) return reject(err)
+        if (res) {
+          assertEquals(res.statusCode, 501, 'not implemented')
+          assertEquals(body.message, 'Not Implemented')
+        }
         five.close()
+        resolve()
       })
     })
   }
 })
-
-Deno.runtests()
