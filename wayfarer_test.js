@@ -1,5 +1,5 @@
 import { test } from 'tap'
-import { wayfarer } from './wayfarer'
+import { wayfarer } from './dist/wayfarer'
 
 test('should match a path', (t) => {
   var r = wayfarer()

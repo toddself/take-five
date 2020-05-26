@@ -2,7 +2,7 @@ import { test } from 'tap'
 import * as assert from 'assert'
 import { nanorequest } from 'nanorequest'
 
-import { TakeFive } from './take-five'
+import { TakeFive } from './dist/take-five'
 
 function formToJSON (buf) {
   const data = buf.toString('utf8')

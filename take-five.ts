@@ -1,3 +1,5 @@
+// Copyright 2016-2020 the take-five authors. All rights reserved
+// Apache 2.0 license
 import * as http from 'http'
 import * as https from 'https'
 import * as querystring from 'querystring'
@@ -47,9 +49,12 @@ export interface TakeFiveContext {
   send: (code: any, content?: any) => Promise<void>
   err: (code: any, content?: any) => Promise<void>
   body?: any
+  finished: boolean
   maxPost?: number,
   allowContentTypes?: string[]
-  query: querystring.ParsedUrlQuery,
+  query: {
+    [key: string]: string
+  },
   params: {
     [key: string]: string
   }
@@ -84,9 +89,9 @@ export class TakeFive {
   allowOrigin: string
   allowCredentials: boolean
   routers: Map<string, WayfarerEmitter>
-  server: http.Server | https.Server
+  server: http.Server = {} as http.Server
   methods: string[]
-  handleError: ErrorHandler
+  handleError: ErrorHandler = () => {}
 
   private _allowMethods: string[] = ['options'].concat(methods)
   private _allowHeaders: string[] = HEADERS.slice(0)
@@ -99,7 +104,7 @@ export class TakeFive {
   }
   private _httpOpts: HTTPOptions
   private _ctx: TakeFiveContext
-  private _urlBase: string
+  private _urlBase: string = ''
 
   constructor (opts: TakeFiveOpts = {}) {
     this.maxPost = opts.maxPost || MAX_POST
@@ -197,17 +202,18 @@ export class TakeFive {
   }
 
   makeCtx (req: http.ClientRequest, res: http.ServerResponse) {
-    const send = (code: any, content?: any): Promise<void> => {
+    const send = (code: any, content?: any) => {
       return new Promise((resolve) => {
         if (typeof content === 'undefined') {
           content = code
           code = 200
         }
+        const isUint8 = Object.prototype.toString.call(content) === '[object Uint8Array]'
 
-        if (typeof content !== 'string') {
+        if (typeof content !== 'string' && !isUint8) {
           if (res.hasHeader('Content-Type')) {
-            const dataType = getHeader(res, 'content-type')
-            const parser = this.parsers[dataType]
+            const type = getHeader(res, 'Content-Type')
+            const parser = this.parsers[type]
             content = parser.toString(content, req.path)
           } else {
             res.setHeader('Content-Type', 'application/json')
@@ -216,11 +222,11 @@ export class TakeFive {
         }
 
         res.statusCode = code
-        req.end(content, 'utf8', resolve)
+        return req.end(content, 'utf8', resolve)
       })
     }
 
-    function err (code: any, content?: any): Promise<void> {
+    function err (code: any, content?: any) {
       return new Promise((resolve) => {
         if (typeof content === 'undefined') {
           if (parseInt(code, 10)) {
@@ -238,7 +244,7 @@ export class TakeFive {
       })
     }
 
-    return Object.assign({}, this.ctx, {send, err})
+    return Object.assign({}, this.ctx, {send, err, finished: false})
   }
 
   _handleError (err: Error, req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext) {
@@ -246,7 +252,7 @@ export class TakeFive {
       this.handleError(err, req, res, ctx)
     }
 
-    if (!req.writableEnded) {
+    if (!ctx.finished) {
       ctx.err('Internal server error')
     }
   }
@@ -265,7 +271,7 @@ export class TakeFive {
   _verifyBody (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext): Promise<void> {
     return new Promise((resolve, reject) => {
       const type = getHeader(res, 'content-type')
-      const size = parseInt(getHeader(res, 'content-length') || undefined, 10)
+      const size = parseInt(getHeader(req, 'content-length') || '0', 10) || 0
       const _ctxMax = parseInt(String(ctx.maxPost), 10)
       const maxPost = Number.isNaN(_ctxMax) ? this.maxPost : _ctxMax
 
@@ -274,20 +280,16 @@ export class TakeFive {
         allowContentTypes = allowContentTypes.concat(ctx.allowContentTypes)
       }
 
-      if (Number.isNaN(size)) {
-        const err = new Error('Content-Length is a required header and not supplied')
-        ctx.err(411, 'Content-Length is required')
-        return reject(err)
-      }
-
-      if (!Number.isNaN(size) && size > maxPost) {
+      // Shut down the sender without consuming the body. I wish there was a
+      // better way to handle this though
+      if (size > maxPost) {
         return ctx.err(413, 'Payload size exceeds maximum size for requests')
       }
 
       if (!allowContentTypes.includes(type)) {
         return ctx.err(415, `Expected data to be of ${allowContentTypes.join(', ')} not ${type}`)
       } else {
-        const data = []
+        const data: Buffer[] = []
         req.on('data', (chunk) => {
           data.push(chunk)
         })
@@ -299,7 +301,7 @@ export class TakeFive {
 
         req.on('error', reject)
         req.on('end', () => {
-          const reqData = Buffer.from([].concat(data))
+          const reqData = Buffer.from(data.concat())
           ctx.body = this.parseBody(reqData, type, req.path)
           resolve()
         })
@@ -312,7 +314,7 @@ export class TakeFive {
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204
-      return res.end()
+      return req.end()
     }
 
     const ctx = this.makeCtx(req, res)
@@ -321,9 +323,9 @@ export class TakeFive {
       const method = req.method.toLowerCase()
       const url = req.path.split('?')[0]
       const router = this.routers.get(method)
-      router(url, req, res, ctx)
+      if (router) router(url, req, res, ctx)
     } catch (err) {
-      if (req.writableEnded) {
+      if (ctx.finished) {
         throw err
       }
       return ctx.err(404, 'Not found')
@@ -358,7 +360,7 @@ export class TakeFive {
             routeHandlers.unshift(this._verifyBody.bind(this))
           }
 
-          ctx.query = querystring.parse(req.path.split('?')[1])
+          ctx.query = Object.fromEntries((new URL(req.path, this._urlBase)).searchParams)
           ctx.params = params
           this._resolveHandlers(req, res, ctx, routeHandlers)
         })
@@ -371,22 +373,19 @@ export class TakeFive {
   }
 
   _resolveHandlers (req: http.ClientRequest, res: http.ServerResponse, ctx: TakeFiveContext, handlers: RouteHandler[]) {
-    const iterate = (handler: RouteHandler) => {
-      const p = handler(req, res, ctx)
-      if (p && typeof p.then === 'function') {
-        p.then(() => {
-          if (!req.writableEnded && handlers.length > 0) {
-            const next = handlers.shift()
-            iterate(next)
-          }
-        })
-          .catch((err) => {
-            this._handleError(err, req, res, ctx)
-          })
+    const iterate = async (handler: RouteHandler) => {
+      try {
+        await handler(req, res, ctx)
+        if (!ctx.finished && handlers.length > 0) {
+          const next = handlers.shift()
+          if (next) iterate(next)
+        }
+      } catch (err) {
+        this._handleError(err, req, res, ctx)
       }
     }
 
     const next = handlers.shift()
-    iterate(next)
+    if (next) iterate(next)
   }
 }
